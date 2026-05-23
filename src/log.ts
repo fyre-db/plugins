@@ -17,6 +17,7 @@ export const log = {
   storage: {
     google: createLogger('storage:google'),
     local: createLogger('storage:local'),
+    onedrive: createLogger('storage:onedrive'),
   },
   transform: createLogger('transform'),
 };

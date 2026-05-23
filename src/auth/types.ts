@@ -114,6 +114,6 @@ export type ServerAuthAdapter = {
 export type OAuthEndpoints = {
   readonly authUrl: string;
   readonly tokenUrl: string;
-  readonly revokeUrl: string;
+  readonly revokeUrl?: string;
   readonly userinfoUrl?: string;
 };
