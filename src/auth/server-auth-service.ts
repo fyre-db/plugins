@@ -192,7 +192,8 @@ export class ServerAuthService {
       let result;
       try {
         result = await adapter.refresh(body.refresh_token);
-      } catch {
+      } catch (err) {
+        log.auth.error('feature refresh failed for %s: %s', adapter.name, err instanceof Error ? err.message : String(err));
         return errorResponse('Feature refresh failed', 401);
       }
 

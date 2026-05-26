@@ -83,8 +83,9 @@ export class BffServerAdapter implements ServerAuthAdapter {
       }),
     });
     if (!response.ok) {
-      log.auth.error('token request failed: %d', response.status);
-      throw new StorageError(`Token request failed: ${response.status}`, { kind: 'auth-expired' });
+      const body = await response.text().catch(() => '');
+      log.auth.error('token request failed: %d %s', response.status, body);
+      throw new StorageError(`Token request failed: ${response.status} ${body}`, { kind: 'auth-expired' });
     }
     return (await response.json()) as { access_token: string; refresh_token?: string; expires_in: number };
   }
