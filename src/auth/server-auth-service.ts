@@ -180,6 +180,7 @@ export class ServerAuthService {
       const providerName = url.searchParams.get('provider');
       const adapter = providerName ? this.byName.get(providerName) : undefined;
       if (!adapter) return errorResponse('Unknown provider', 400);
+      log.auth('feature refresh requested: provider=%s feature=%s', providerName, feature);
 
       let body;
       try {
@@ -193,7 +194,8 @@ export class ServerAuthService {
       try {
         result = await adapter.refresh(body.refresh_token);
       } catch (err) {
-        log.auth.error('feature refresh failed for %s: %s', adapter.name, err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
+        log.auth.error('feature refresh failed: provider=%s feature=%s error=%s', adapter.name, feature, msg);
         return errorResponse('Feature refresh failed', 401);
       }
 
@@ -208,6 +210,7 @@ export class ServerAuthService {
 
     // Login refresh: use the cookie token
     const { adapter, token } = resolved;
+    log.auth('login refresh requested: provider=%s', adapter.name);
     let result;
     try {
       result = await adapter.refresh(token);

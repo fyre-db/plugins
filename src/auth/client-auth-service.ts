@@ -26,6 +26,7 @@ export class ClientAuthService {
   private readonly byName: ReadonlyMap<string, ClientAuthAdapter>;
   private cached: AccessToken | null = null;
   private inflight: Promise<AccessToken | null> | null = null;
+  private readonly featureTokenCache = new Map<string, AccessToken>();
   private readonly state$$: BehaviorSubject<AuthState>;
   private readonly returnUrlKey: string | undefined;
   private readonly featureCredsKey: string | undefined;
@@ -98,10 +99,22 @@ export class ClientAuthService {
    * not affect the cached login token or auth state — it returns a
    * one-off access token for the requested feature.
    */
-  async refreshFeature(adapterName: string, feature: string, refreshToken: string): Promise<AccessToken | null> {
+  async getFeatureToken(adapterName: string, feature: string, refreshToken: string): Promise<AccessToken | null> {
     const adapter = this.byName.get(adapterName);
     if (!adapter) return null;
-    return adapter.refresh(feature, refreshToken);
+
+    // Return cached token if still valid (5-minute margin)
+    const cacheKey = `${adapterName}:${feature}:${refreshToken}`;
+    const cached = this.featureTokenCache.get(cacheKey);
+    if (cached?.expiresAt && cached.expiresAt > Date.now() + 5 * 60 * 1000) {
+      return cached;
+    }
+
+    const result = await adapter.refresh(feature, refreshToken);
+    if (result) {
+      this.featureTokenCache.set(cacheKey, result);
+    }
+    return result;
   }
 
   /**

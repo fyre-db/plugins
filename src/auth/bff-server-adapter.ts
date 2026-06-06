@@ -52,10 +52,12 @@ export class BffServerAdapter implements ServerAuthAdapter {
   }
 
   async refresh(refreshToken: string): Promise<ServerAuthTokenResult> {
+    log.auth('refreshing token for %s (token=%s...)', this.name, refreshToken.slice(0, 8));
     const r = await this.tokenRequest({
       refresh_token: refreshToken,
       grant_type: 'refresh_token',
     });
+    log.auth('token refreshed for %s (expires_in=%d)', this.name, r.expires_in);
     return { accessToken: r.access_token, expiresIn: r.expires_in, refreshToken: r.refresh_token };
   }
 
@@ -83,8 +85,13 @@ export class BffServerAdapter implements ServerAuthAdapter {
       }),
     });
     if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      log.auth.error('token request failed: %d %s', response.status, body);
+      const body = await response.text().catch(() => '(no body)');
+      log.auth.error(
+        'token request failed: status=%d url=%s body=%s',
+        response.status,
+        this.config.endpoints.tokenUrl,
+        body || '(empty)',
+      );
       throw new StorageError(`Token request failed: ${response.status} ${body}`, { kind: 'auth-expired' });
     }
     return (await response.json()) as { access_token: string; refresh_token?: string; expires_in: number };
