@@ -1,5 +1,5 @@
 import type { AccessToken } from '@/auth/types';
-import { StorageError, StrataPluginConfigError } from '@/errors/strata-error';
+import { StorageError, FyreDbPluginConfigError } from '@/errors/fyredb-error';
 import { log } from '@/log';
 import type {
   CloudFile,
@@ -112,7 +112,7 @@ export class GoogleDriveService extends GoogleDriveAdapter implements CloudFileS
           : undefined;
 
     if (!parents) {
-      throw new StrataPluginConfigError(`Cannot create folder in "${space.id}" without a parent folder`);
+      throw new FyreDbPluginConfigError(`Cannot create folder in "${space.id}" without a parent folder`);
     }
 
     const res = await fetch(`${DRIVE_API}?fields=id,name,mimeType,modifiedTime,size`, {

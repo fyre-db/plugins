@@ -1,7 +1,7 @@
 import type { StorageAdapter, Tenant } from '@fyre-db/core'
 import { compositeKey, fnvHash, generateId } from '@fyre-db/core'
 import type { AccessToken } from '@/auth/types'
-import { StorageError, StrataPluginConfigError } from '@/errors/strata-error'
+import { StorageError, FyreDbPluginConfigError } from '@/errors/fyredb-error'
 import { mapOneDriveError } from './onedrive-errors'
 import { log } from '@/log'
 
@@ -18,9 +18,9 @@ function getDriveMeta(tenant: Tenant | undefined): DriveMeta {
   if (!tenant) return { space: 'approot' }
   const meta = tenant.meta as { space?: string; folderId?: string }
   const space = meta.space as DriveSpace | undefined
-  if (!space) throw new StrataPluginConfigError(`Tenant "${tenant.id}" missing required meta.space`)
+  if (!space) throw new FyreDbPluginConfigError(`Tenant "${tenant.id}" missing required meta.space`)
   if (space === 'personal' && !meta.folderId) {
-    throw new StrataPluginConfigError(`Tenant "${tenant.id}" with space "personal" requires meta.folderId`)
+    throw new FyreDbPluginConfigError(`Tenant "${tenant.id}" with space "personal" requires meta.folderId`)
   }
   return { space, folderId: meta.folderId }
 }

@@ -1,7 +1,7 @@
 export {
-  StrataError,
-  StrataConfigError,
+  FyreDbError,
+  FyreDbConfigError,
   StorageError,
-  StrataPluginConfigError,
-} from './strata-error';
-export type { StorageErrorKind } from './strata-error';
+  FyreDbPluginConfigError,
+} from './fyredb-error';
+export type { StorageErrorKind } from './fyredb-error';

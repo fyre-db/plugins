@@ -6,7 +6,7 @@ describe('withGzip', () => {
   it('round-trips data through write/read', async () => {
     const inner = new MemoryStorageAdapter();
     const adapter = withGzip(inner);
-    const input = new TextEncoder().encode('Hello, Strata!');
+    const input = new TextEncoder().encode('Hello, FyreDb!');
     await adapter.write(undefined, 'test', input);
     const result = await adapter.read(undefined, 'test');
     expect(result).toEqual(input);
@@ -15,7 +15,7 @@ describe('withGzip', () => {
   it('compressed data on inner adapter differs from input', async () => {
     const inner = new MemoryStorageAdapter();
     const adapter = withGzip(inner);
-    const input = new TextEncoder().encode('Hello, Strata!');
+    const input = new TextEncoder().encode('Hello, FyreDb!');
     await adapter.write(undefined, 'test', input);
     const raw = await inner.read(undefined, 'test');
     expect(raw).not.toEqual(input);

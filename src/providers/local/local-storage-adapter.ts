@@ -1,13 +1,13 @@
 import type { StorageAdapter, Tenant } from '@fyre-db/core';
 import { compositeKey, toBase64, fromBase64 } from '@fyre-db/core';
-import { StorageError, StrataPluginConfigError } from '@/errors/strata-error';
+import { StorageError, FyreDbPluginConfigError } from '@/errors/fyredb-error';
 import { log } from '@/log';
 
 export class LocalStorageAdapter implements StorageAdapter {
 
-  constructor(private readonly prefix: string = 'strata') {
+  constructor(private readonly prefix: string = 'fyredb') {
     if (typeof globalThis.localStorage === 'undefined') {
-      throw new StrataPluginConfigError('LocalStorageAdapter requires a browser environment with localStorage');
+      throw new FyreDbPluginConfigError('LocalStorageAdapter requires a browser environment with localStorage');
     }
   }
 

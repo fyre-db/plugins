@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GoogleDriveService, GOOGLE_DRIVE_SPACES } from '@/providers/google/google-drive-service';
-import { StorageError, StrataPluginConfigError } from '@/errors/strata-error';
+import { StorageError, FyreDbPluginConfigError } from '@/errors/fyredb-error';
 import type { AccessToken } from '@/auth/types';
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -121,11 +121,11 @@ describe('GoogleDriveService', () => {
     expect(file.isFolder).toBe(true);
   });
 
-  it('createFolder() throws StrataPluginConfigError when sharedWithMe and no parentId', async () => {
+  it('createFolder() throws FyreDbPluginConfigError when sharedWithMe and no parentId', async () => {
     const svc = new GoogleDriveService(tokenSupplier());
     await expect(
       svc.createFolder(GOOGLE_DRIVE_SPACES.sharedWithMe, 'Folder', null),
-    ).rejects.toThrow(StrataPluginConfigError);
+    ).rejects.toThrow(FyreDbPluginConfigError);
   });
 
   // --- requireToken ---

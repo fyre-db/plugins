@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Tenant } from '@fyre-db/core';
 import { LocalStorageAdapter } from '@/providers/local/local-storage-adapter';
-import { StorageError } from '@/errors/strata-error';
+import { StorageError } from '@/errors/fyredb-error';
 
 // Minimal localStorage polyfill for Node
 function createLocalStoragePolyfill(): Storage {

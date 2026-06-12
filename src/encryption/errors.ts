@@ -1,11 +1,11 @@
-import { StrataError } from '@fyre-db/core';
+import { FyreDbError } from '@fyre-db/core';
 
 export type EncryptionErrorKind =
   | 'dek-not-loaded'
   | 'invalid-key-data'
   | 'data-corrupted';
 
-export class EncryptionError extends StrataError {
+export class EncryptionError extends FyreDbError {
   constructor(message: string, options: {
     readonly kind: EncryptionErrorKind;
     readonly cause?: Error;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BffServerAdapter, type BffServerAdapterConfig } from '@/auth/bff-server-adapter';
-import { StrataPluginConfigError } from '@/errors/strata-error';
+import { FyreDbPluginConfigError } from '@/errors/fyredb-error';
 
 const baseConfig: BffServerAdapterConfig = {
   name: 'google',
@@ -53,9 +53,9 @@ describe('BffServerAdapter', () => {
     expect(url.searchParams.get('prompt')).toBe('consent');
   });
 
-  it('login() throws StrataPluginConfigError for unknown feature', () => {
+  it('login() throws FyreDbPluginConfigError for unknown feature', () => {
     const adapter = new BffServerAdapter(baseConfig);
-    expect(() => adapter.login('state', 'unknown-feature')).toThrow(StrataPluginConfigError);
+    expect(() => adapter.login('state', 'unknown-feature')).toThrow(FyreDbPluginConfigError);
   });
 
   it('exchangeCode() posts to tokenUrl and returns tokens', async () => {

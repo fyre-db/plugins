@@ -1,4 +1,4 @@
-import { StrataPluginConfigError } from '@/errors/strata-error';
+import { FyreDbPluginConfigError } from '@/errors/fyredb-error';
 
 export type GoogleDriveSpace = 'appDataFolder' | 'drive' | 'sharedWithMe';
 
@@ -12,13 +12,13 @@ export function validateGoogleDriveMeta(
 ): GoogleDriveTenantMeta {
   const space = meta.space as string | undefined;
   if (!space) {
-    throw new StrataPluginConfigError('meta.space is required');
+    throw new FyreDbPluginConfigError('meta.space is required');
   }
   if (space !== 'appDataFolder' && space !== 'drive' && space !== 'sharedWithMe') {
-    throw new StrataPluginConfigError(`Invalid meta.space: "${space}". Must be "appDataFolder", "drive", or "sharedWithMe"`);
+    throw new FyreDbPluginConfigError(`Invalid meta.space: "${space}". Must be "appDataFolder", "drive", or "sharedWithMe"`);
   }
   if ((space === 'drive' || space === 'sharedWithMe') && !meta.folderId) {
-    throw new StrataPluginConfigError(`meta.folderId is required when space is "${space}"`);
+    throw new FyreDbPluginConfigError(`meta.folderId is required when space is "${space}"`);
   }
   return { space, folderId: meta.folderId as string | undefined };
 }

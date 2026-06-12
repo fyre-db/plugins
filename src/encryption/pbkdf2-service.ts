@@ -28,7 +28,7 @@ export class Pbkdf2EncryptionService implements EncryptionService {
     this.targets = options.targets;
     this.strategy = options.strategy;
     this.tenantKey = options.tenantKey ?? '__tenants';
-    this.markerKey = options.markerKey ?? '__strata';
+    this.markerKey = options.markerKey ?? '__fyredb';
   }
 
   private castKeys(keys: EncryptionKeys): Pbkdf2Keys | null {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseRetryAfter, mapDriveError } from '@/providers/google/google-drive-errors';
-import { StorageError } from '@/errors/strata-error';
+import { StorageError } from '@/errors/fyredb-error';
 
 describe('parseRetryAfter', () => {
   it('returns milliseconds from a numeric Retry-After header', () => {

@@ -1,4 +1,4 @@
-import { StrataPluginConfigError } from '@/errors/strata-error';
+import { FyreDbPluginConfigError } from '@/errors/fyredb-error';
 
 export type OneDriveSpace = 'approot' | 'personal' | 'shared';
 
@@ -12,13 +12,13 @@ export function validateOneDriveMeta(
 ): OneDriveTenantMeta {
   const space = meta.space as string | undefined;
   if (!space) {
-    throw new StrataPluginConfigError('meta.space is required');
+    throw new FyreDbPluginConfigError('meta.space is required');
   }
   if (space !== 'approot' && space !== 'personal' && space !== 'shared') {
-    throw new StrataPluginConfigError(`Invalid meta.space: "${space}". Must be "approot", "personal", or "shared"`);
+    throw new FyreDbPluginConfigError(`Invalid meta.space: "${space}". Must be "approot", "personal", or "shared"`);
   }
   if ((space === 'personal' || space === 'shared') && !meta.folderId) {
-    throw new StrataPluginConfigError(`meta.folderId is required when space is "${space}"`);
+    throw new FyreDbPluginConfigError(`meta.folderId is required when space is "${space}"`);
   }
   return { space, folderId: meta.folderId as string | undefined };
 }

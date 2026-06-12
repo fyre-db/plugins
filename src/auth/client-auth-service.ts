@@ -1,6 +1,6 @@
 import { BehaviorSubject, distinctUntilChanged, type Observable } from 'rxjs';
 import type { AccessToken, ClientAuthAdapter, AuthState, FeatureCreds } from './types';
-import { StrataPluginConfigError } from '@/errors/strata-error';
+import { FyreDbPluginConfigError } from '@/errors/fyredb-error';
 import { log } from '@/log';
 
 export type SupportedAuth = {
@@ -38,7 +38,7 @@ export class ClientAuthService {
   ) {
     const byName = new Map<string, ClientAuthAdapter>();
     for (const a of adapters) {
-      if (byName.has(a.name)) throw new StrataPluginConfigError(`ClientAuthService: duplicate adapter name "${a.name}"`);
+      if (byName.has(a.name)) throw new FyreDbPluginConfigError(`ClientAuthService: duplicate adapter name "${a.name}"`);
       byName.set(a.name, a);
     }
     this.byName = byName;

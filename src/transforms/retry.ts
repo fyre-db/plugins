@@ -1,6 +1,6 @@
 import type { StorageAdapter, Tenant } from '@fyre-db/core';
-import { StrataError } from '@fyre-db/core';
-import { StorageError } from '../errors/strata-error';
+import { FyreDbError } from '@fyre-db/core';
+import { StorageError } from '../errors/fyredb-error';
 import { log } from '@/log';
 
 export type RetryOptions = {
@@ -10,7 +10,7 @@ export type RetryOptions = {
 };
 
 function isRetryable(err: unknown): boolean {
-  if (err instanceof StrataError) return err.retryable;
+  if (err instanceof FyreDbError) return err.retryable;
   return true;
 }
 
@@ -33,7 +33,7 @@ async function withRetries<T>(
     try {
       return await fn();
     } catch (err) {
-      lastError = err instanceof Error ? err : new StrataError(String(err), { kind: 'unknown' });
+      lastError = err instanceof Error ? err : new FyreDbError(String(err), { kind: 'unknown' });
       if (attempt < maxRetries && isRetryable(err)) {
         const delay = getRetryDelay(err, attempt, delayMs);
         log.transform('retry attempt %d/%d (delay=%dms): %s', attempt + 1, maxRetries, Math.round(delay), lastError.message);

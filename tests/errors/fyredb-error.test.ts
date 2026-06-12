@@ -1,35 +1,35 @@
 import { describe, it, expect } from 'vitest';
 import {
-  StrataError,
+  FyreDbError,
   StorageError,
-  StrataPluginConfigError,
-} from '@/errors/strata-error';
+  FyreDbPluginConfigError,
+} from '@/errors/fyredb-error';
 
-describe('StrataError hierarchy', () => {
-  it('StrataError has correct properties', () => {
+describe('FyreDbError hierarchy', () => {
+  it('FyreDbError has correct properties', () => {
     const cause = new Error('raw');
-    const err = new StrataError('something broke', {
+    const err = new FyreDbError('something broke', {
       kind: 'unknown',
       retryable: false,
       cause,
     });
     expect(err).toBeInstanceOf(Error);
-    expect(err).toBeInstanceOf(StrataError);
-    expect(err.name).toBe('StrataError');
+    expect(err).toBeInstanceOf(FyreDbError);
+    expect(err.name).toBe('FyreDbError');
     expect(err.kind).toBe('unknown');
     expect(err.retryable).toBe(false);
     expect(err.cause).toBe(cause);
     expect(err.message).toBe('something broke');
   });
 
-  it('StrataError defaults retryable to false', () => {
-    const err = new StrataError('msg', { kind: 'unknown' });
+  it('FyreDbError defaults retryable to false', () => {
+    const err = new FyreDbError('msg', { kind: 'unknown' });
     expect(err.retryable).toBe(false);
   });
 
   it('StorageError auth-expired', () => {
     const err = new StorageError('Token expired', { kind: 'auth-expired' });
-    expect(err).toBeInstanceOf(StrataError);
+    expect(err).toBeInstanceOf(FyreDbError);
     expect(err).toBeInstanceOf(StorageError);
     expect(err.name).toBe('StorageError');
     expect(err.kind).toBe('auth-expired');
@@ -38,7 +38,7 @@ describe('StrataError hierarchy', () => {
 
   it('StorageError quota-exceeded', () => {
     const err = new StorageError('Full', { kind: 'quota-exceeded' });
-    expect(err).toBeInstanceOf(StrataError);
+    expect(err).toBeInstanceOf(FyreDbError);
     expect(err.kind).toBe('quota-exceeded');
     expect(err.retryable).toBe(false);
   });
@@ -86,7 +86,7 @@ describe('StrataError hierarchy', () => {
   });
 
   it('can be caught by kind in a switch', () => {
-    const err: StrataError = new StorageError('Expired', { kind: 'auth-expired' });
+    const err: FyreDbError = new StorageError('Expired', { kind: 'auth-expired' });
     let matched = false;
     switch (err.kind) {
       case 'auth-expired':
@@ -98,14 +98,14 @@ describe('StrataError hierarchy', () => {
 
   it('can be caught by instanceof', () => {
     const err: Error = new StorageError('Throttled', { kind: 'rate-limited', retryable: true, retryAfterMs: 1000 });
-    expect(err instanceof StrataError).toBe(true);
+    expect(err instanceof FyreDbError).toBe(true);
     expect(err instanceof StorageError).toBe(true);
   });
 
-  it('StrataPluginConfigError is not a StrataError', () => {
-    const err = new StrataPluginConfigError('Bad config');
+  it('FyreDbPluginConfigError is not a FyreDbError', () => {
+    const err = new FyreDbPluginConfigError('Bad config');
     expect(err).toBeInstanceOf(Error);
-    expect(err).not.toBeInstanceOf(StrataError);
-    expect(err.name).toBe('StrataPluginConfigError');
+    expect(err).not.toBeInstanceOf(FyreDbError);
+    expect(err.name).toBe('FyreDbPluginConfigError');
   });
 });

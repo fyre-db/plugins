@@ -1,5 +1,5 @@
 import type { AccessToken } from '@/auth/types';
-import { StorageError } from '@/errors/strata-error';
+import { StorageError } from '@/errors/fyredb-error';
 import { log } from '@/log';
 import type {
   CloudFile,

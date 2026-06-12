@@ -3,9 +3,9 @@ import type { Tenant } from '@fyre-db/core';
 import { GoogleDriveAdapter } from '@/providers/google/google-drive-adapter';
 import {
   StorageError,
-  StrataPluginConfigError,
-  StrataError,
-} from '@/errors/strata-error';
+  FyreDbPluginConfigError,
+  FyreDbError,
+} from '@/errors/fyredb-error';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3/files';
@@ -207,7 +207,7 @@ describe('GoogleDriveAdapter', () => {
       mockFetch.mockResolvedValueOnce(errorResponse(500, 'Internal Server Error'));
 
       await expect(adapter.write(appDataTenant, 'doc', new Uint8Array([1]))).rejects.toThrow(
-        StrataError,
+        FyreDbError,
       );
     });
 

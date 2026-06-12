@@ -1,6 +1,6 @@
-import { StrataError, StrataConfigError } from '@fyre-db/core';
+import { FyreDbError, FyreDbConfigError } from '@fyre-db/core';
 
-export { StrataError, StrataConfigError } from '@fyre-db/core';
+export { FyreDbError, FyreDbConfigError } from '@fyre-db/core';
 
 export type StorageErrorKind =
   | 'auth-expired'
@@ -12,7 +12,7 @@ export type StorageErrorKind =
   | 'data-corrupted'
   | 'unknown';
 
-export class StorageError extends StrataError {
+export class StorageError extends FyreDbError {
   readonly retryAfterMs?: number;
 
   constructor(message: string, options: {
@@ -27,9 +27,9 @@ export class StorageError extends StrataError {
   }
 }
 
-export class StrataPluginConfigError extends StrataConfigError {
+export class FyreDbPluginConfigError extends FyreDbConfigError {
   constructor(message: string) {
     super(message);
-    this.name = 'StrataPluginConfigError';
+    this.name = 'FyreDbPluginConfigError';
   }
 }

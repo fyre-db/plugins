@@ -1,4 +1,4 @@
-import { StorageError } from '@/errors/strata-error';
+import { StorageError } from '@/errors/fyredb-error';
 
 export function parseRetryAfter(response: Response): number | undefined {
   const header = response.headers.get('Retry-After');

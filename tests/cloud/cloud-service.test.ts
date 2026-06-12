@@ -3,7 +3,7 @@ import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { CloudService, type CloudAdapter } from '@/cloud/cloud-service';
 import type { ClientAuthService } from '@/auth/client-auth-service';
 import type { AuthState } from '@/auth/types';
-import { StrataPluginConfigError } from '@/errors/strata-error';
+import { FyreDbPluginConfigError } from '@/errors/fyredb-error';
 
 function mockAdapter(name: string): CloudAdapter {
   return {
@@ -20,11 +20,11 @@ function mockAuth(initial: AuthState = { status: 'loading' }) {
 }
 
 describe('CloudService', () => {
-  it('throws StrataPluginConfigError on duplicate adapter names', () => {
+  it('throws FyreDbPluginConfigError on duplicate adapter names', () => {
     const { service } = mockAuth();
     const a = mockAdapter('google');
     const b = mockAdapter('google');
-    expect(() => new CloudService([a, b], service)).toThrow(StrataPluginConfigError);
+    expect(() => new CloudService([a, b], service)).toThrow(FyreDbPluginConfigError);
   });
 
   it('active$ emits null initially when state is loading', async () => {

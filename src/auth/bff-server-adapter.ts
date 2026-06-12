@@ -1,5 +1,5 @@
 import type { ServerAuthAdapter, ServerAuthTokenResult, OAuthEndpoints } from './types';
-import { StorageError, StrataPluginConfigError } from '@/errors/strata-error';
+import { StorageError, FyreDbPluginConfigError } from '@/errors/fyredb-error';
 import { log } from '@/log';
 
 export type BffServerAdapterConfig = {
@@ -29,7 +29,7 @@ export class BffServerAdapter implements ServerAuthAdapter {
 
   login(state: string, feature: string): string {
     const scopes = this.scopes[feature] as string[] | undefined;
-    if (!scopes) throw new StrataPluginConfigError(`Unknown feature: ${feature}`);
+    if (!scopes) throw new FyreDbPluginConfigError(`Unknown feature: ${feature}`);
     const url = new URL(this.config.endpoints.authUrl);
     url.searchParams.set('client_id', this.config.clientId);
     url.searchParams.set('redirect_uri', this.config.callbackUrl);

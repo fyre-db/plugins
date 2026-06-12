@@ -1,7 +1,7 @@
 import type { StorageAdapter, Tenant } from '@fyre-db/core'
 import { compositeKey, fnvHash, generateId } from '@fyre-db/core'
 import type { AccessToken } from '@/auth/types'
-import { StorageError, StrataPluginConfigError } from '@/errors/strata-error'
+import { StorageError, FyreDbPluginConfigError } from '@/errors/fyredb-error'
 import { mapDriveError } from './google-drive-errors'
 import { log } from '@/log'
 
@@ -19,12 +19,12 @@ function getDriveMeta(tenant: Tenant | undefined): DriveMeta {
   if (!tenant) return { space: 'appDataFolder' }
   const meta = tenant.meta as { space?: string; folderId?: string }
   const space = meta.space as DriveSpace | undefined
-  if (!space) throw new StrataPluginConfigError(`Tenant "${tenant.id}" missing required meta.space`)
+  if (!space) throw new FyreDbPluginConfigError(`Tenant "${tenant.id}" missing required meta.space`)
   if (space === 'drive' && !meta.folderId) {
-    throw new StrataPluginConfigError(`Tenant "${tenant.id}" with space "drive" requires meta.folderId`)
+    throw new FyreDbPluginConfigError(`Tenant "${tenant.id}" with space "drive" requires meta.folderId`)
   }
   if (space === 'sharedWithMe' && !meta.folderId) {
-    throw new StrataPluginConfigError(`Tenant "${tenant.id}" with space "sharedWithMe" requires meta.folderId`)
+    throw new FyreDbPluginConfigError(`Tenant "${tenant.id}" with space "sharedWithMe" requires meta.folderId`)
   }
   return { space, folderId: meta.folderId }
 }
@@ -95,7 +95,7 @@ export class GoogleDriveAdapter implements StorageAdapter {
         metadata.parents = [folderId]
       }
 
-      const boundary = `-----strata-${crypto.randomUUID()}`
+      const boundary = `-----fyredb-${crypto.randomUUID()}`
       const body = [
         `--${boundary}\r\n`,
         'Content-Type: application/json; charset=UTF-8\r\n\r\n',
