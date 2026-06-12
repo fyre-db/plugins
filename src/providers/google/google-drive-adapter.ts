@@ -1,5 +1,5 @@
-import type { StorageAdapter, Tenant } from '@strata/core'
-import { compositeKey, fnvHash, generateId } from '@strata/core'
+import type { StorageAdapter, Tenant } from '@fyre-db/core'
+import { compositeKey, fnvHash, generateId } from '@fyre-db/core'
 import type { AccessToken } from '@/auth/types'
 import { StorageError, StrataPluginConfigError } from '@/errors/strata-error'
 import { mapDriveError } from './google-drive-errors'

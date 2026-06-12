@@ -1,4 +1,4 @@
-import { StrataError } from '@strata/core';
+import { StrataError } from '@fyre-db/core';
 
 export type EncryptionErrorKind =
   | 'dek-not-loaded'

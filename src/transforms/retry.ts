@@ -1,5 +1,5 @@
-import type { StorageAdapter, Tenant } from '@strata/core';
-import { StrataError } from '@strata/core';
+import type { StorageAdapter, Tenant } from '@fyre-db/core';
+import { StrataError } from '@fyre-db/core';
 import { StorageError } from '../errors/strata-error';
 import { log } from '@/log';
 

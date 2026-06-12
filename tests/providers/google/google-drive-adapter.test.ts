@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import type { Tenant } from '@strata/core';
+import type { Tenant } from '@fyre-db/core';
 import { GoogleDriveAdapter } from '@/providers/google/google-drive-adapter';
 import {
   StorageError,

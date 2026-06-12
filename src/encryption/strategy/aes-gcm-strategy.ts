@@ -1,6 +1,6 @@
-import type { EncryptionStrategy } from '@strata/core';
+import type { EncryptionStrategy } from '@fyre-db/core';
 import { aesGcmEncrypt, aesGcmDecrypt } from '../crypto';
-import { InvalidEncryptionKeyError } from '@strata/core';
+import { InvalidEncryptionKeyError } from '@fyre-db/core';
 
 export class AesGcmEncryptionStrategy implements EncryptionStrategy<CryptoKey> {
   async encrypt(data: Uint8Array, key: CryptoKey): Promise<Uint8Array> {

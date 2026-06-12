@@ -1,6 +1,6 @@
-import { StrataError, StrataConfigError } from '@strata/core';
+import { StrataError, StrataConfigError } from '@fyre-db/core';
 
-export { StrataError, StrataConfigError } from '@strata/core';
+export { StrataError, StrataConfigError } from '@fyre-db/core';
 
 export type StorageErrorKind =
   | 'auth-expired'

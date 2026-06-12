@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { Tenant } from '@strata/core';
+import type { Tenant } from '@fyre-db/core';
 import { LocalStorageAdapter } from '@/providers/local/local-storage-adapter';
 import { StorageError } from '@/errors/strata-error';
 

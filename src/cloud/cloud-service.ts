@@ -1,5 +1,5 @@
 import { BehaviorSubject, distinctUntilChanged, type Observable, type Subscription } from 'rxjs';
-import type { StorageAdapter } from '@strata/core';
+import type { StorageAdapter } from '@fyre-db/core';
 import type { ClientAuthService } from '@/auth/client-auth-service';
 import { StrataPluginConfigError } from '@/errors/strata-error';
 import { log } from '@/log';

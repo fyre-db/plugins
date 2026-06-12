@@ -1,5 +1,5 @@
-import type { StorageAdapter, Tenant } from '@strata/core';
-import { compositeKey, toBase64, fromBase64 } from '@strata/core';
+import type { StorageAdapter, Tenant } from '@fyre-db/core';
+import { compositeKey, toBase64, fromBase64 } from '@fyre-db/core';
 import { StorageError, StrataPluginConfigError } from '@/errors/strata-error';
 import { log } from '@/log';
 

@@ -1,5 +1,5 @@
-import type { StorageAdapter, Tenant } from '@strata/core';
-import { toArrayBuffer, streamToUint8Array } from '@strata/core';
+import type { StorageAdapter, Tenant } from '@fyre-db/core';
+import { toArrayBuffer, streamToUint8Array } from '@fyre-db/core';
 
 const GZIP_MARKER = new Uint8Array([0x00, 0x47, 0x5A]); // \0GZ
 

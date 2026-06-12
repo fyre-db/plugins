@@ -1,4 +1,4 @@
-import type { EncryptionStrategy, EncryptionService, EncryptionKeys } from '@strata/core';
+import type { EncryptionStrategy, EncryptionService, EncryptionKeys } from '@fyre-db/core';
 import {
   pbkdf2DeriveKeyWithSalt, aesGcmGenerateKey, exportCryptoKey, importAesGcmKey,
 } from './crypto';

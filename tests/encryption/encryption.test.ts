@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { InvalidEncryptionKeyError } from '@strata/core';
+import { InvalidEncryptionKeyError } from '@fyre-db/core';
 import { Pbkdf2EncryptionService, AesGcmEncryptionStrategy } from '@/encryption/index';
 
 describe('Pbkdf2EncryptionService', () => {

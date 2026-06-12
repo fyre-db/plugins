@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { MemoryStorageAdapter } from '@strata/core';
+import { MemoryStorageAdapter } from '@fyre-db/core';
 import { withRetry } from '@/transforms/retry';
 
 describe('withRetry', () => {

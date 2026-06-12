@@ -1,4 +1,4 @@
-import { toArrayBuffer, toBase64, fromBase64 } from '@strata/core';
+import { toArrayBuffer, toBase64, fromBase64 } from '@fyre-db/core';
 import { EncryptionError } from './errors';
 
 // ─── Constants ───────────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { StorageAdapter } from '@strata/core';
+import type { StorageAdapter } from '@fyre-db/core';
 
 /** Top-level logical partition within a cloud (e.g. "My Drive"). */
 export type CloudSpace = {

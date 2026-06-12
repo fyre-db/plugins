@@ -7,7 +7,7 @@ import {
   aesGcmEncrypt,
   aesGcmDecrypt,
 } from '@/encryption/crypto';
-import { InvalidEncryptionKeyError } from '@strata/core';
+import { InvalidEncryptionKeyError } from '@fyre-db/core';
 
 describe('Encryption primitives', () => {
   const appId = 'test-app';

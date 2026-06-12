@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MemoryStorageAdapter } from '@strata/core';
+import { MemoryStorageAdapter } from '@fyre-db/core';
 import { withGzip } from '@/transforms/index';
 
 describe('withGzip', () => {
