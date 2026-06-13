@@ -97,12 +97,18 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES: ${{ inputs.notes }}
         run: |
-          NOTES="${{ inputs.notes }}"
-          if [ -z "$NOTES" ]; then NOTES="Release v${VERSION}"; fi
+          # Write notes to a file to avoid the shell interpreting markdown
+          # backticks/special chars (inline --notes "$NOTES" breaks on them).
+          if [ -z "$RELEASE_NOTES" ]; then
+            printf '%s' "Release v${VERSION}" > "$RUNNER_TEMP/release-notes.md"
+          else
+            printf '%s' "$RELEASE_NOTES" > "$RUNNER_TEMP/release-notes.md"
+          fi
           gh release create "v${VERSION}" \
             --target main \
             --title "v${VERSION}" \
-            --notes "$NOTES"
+            --notes-file "$RUNNER_TEMP/release-notes.md"
 
 
