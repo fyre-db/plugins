@@ -1,12 +1,16 @@
 name: Release & Publish
 
-# Manually triggered release for @fyre-db/plugins.
-# You provide the version + release notes; this workflow validates, publishes to
-# npm (with provenance), tags the current main commit, and creates the GitHub
-# Release. The version bump is *ephemeral* — package.json is bumped only inside
-# the runner for the publish; it is never committed back to main. The git tag is
-# the source of truth for the released version. main/package.json stays at the
-# placeholder 0.0.0.
+# Version-triggered release for @fyre-db/plugins.
+#
+# Releases are driven by the committed `package.json` version. When a push to
+# `main` changes `package.json` (typically a patch bump), this workflow checks
+# whether that version is already on npm / already tagged; if not, it validates,
+# publishes to npm (with provenance), tags the commit, and creates the GitHub
+# Release. If the version is unchanged (already published), it is a no-op — so
+# unrelated package.json edits never trigger a duplicate release.
+#
+# The committed `version` is the source of truth (no ephemeral runner-only bump).
+# To cut a release: bump the version in package.json on main.
 #
 # Requirements:
 #   - Runs only from `main`.
@@ -14,16 +18,13 @@ name: Release & Publish
 #   - No push to a protected branch — no secret/PAT/bypass needed.
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to release (e.g. 0.1.0 — no leading v)"
-        required: true
-        type: string
-      notes:
-        description: "Release notes (markdown)"
-        required: false
-        type: string
+  push:
+    branches: [main]
+    paths:
+      - package.json
+  # Manual fallback — re-runs the same version gate (reads version from
+  # package.json; publishes only if that version is not already released).
+  workflow_dispatch: {}
 
 permissions:
   id-token: write # OIDC for npm provenance
@@ -44,65 +45,74 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Validate version input
-        run: |
-          VERSION="${{ inputs.version }}"
-          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
-            echo "::error::'$VERSION' is not a valid semver version (expected e.g. 0.1.0)."
-            exit 1
-          fi
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - run: npm install
-
-      - name: Guard — version not already published
+      - name: Read package metadata
+        id: meta
         run: |
           NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::package.json version '$VERSION' is not valid semver (expected e.g. 0.1.0)."
+            exit 1
+          fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Gate — publish only if this version is new
+        id: gate
+        run: |
+          NAME="${{ steps.meta.outputs.name }}"
+          VERSION="${{ steps.meta.outputs.version }}"
           PUBLISHED=$(npm view "${NAME}@${VERSION}" version 2>/dev/null || true)
           if [ "$PUBLISHED" = "$VERSION" ]; then
-            echo "::error::${NAME}@${VERSION} is already published to npm."
-            exit 1
+            echo "::notice::${NAME}@${VERSION} is already published — nothing to do."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "::notice::Tag v${VERSION} already exists — nothing to do."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Releasing ${NAME}@${VERSION}."
+            echo "publish=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Guard — git tag does not already exist
-        run: |
-          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-            echo "::error::Tag v${VERSION} already exists."
-            exit 1
-          fi
+      - if: steps.gate.outputs.publish == 'true'
+        run: npm install
 
       # Full validation before any irreversible step.
-      - run: npm run lint
-      - run: npm run test
-      - run: npm run build
+      - if: steps.gate.outputs.publish == 'true'
+        run: npm run lint
+      - if: steps.gate.outputs.publish == 'true'
+        run: npm run test
+      - if: steps.gate.outputs.publish == 'true'
+        run: npm run build
 
-      - name: Ephemeral version bump (runner-only, not committed)
-        run: npm version "$VERSION" --no-git-tag-version
-
-      - run: npm publish --dry-run --access public
+      - if: steps.gate.outputs.publish == 'true'
+        run: npm publish --dry-run --access public
 
       - name: Publish to npm
+        if: steps.gate.outputs.publish == 'true'
         run: npm publish --provenance --access public
 
-      - name: Tag the released main commit
+      - name: Tag the released commit
+        if: steps.gate.outputs.publish == 'true'
         run: |
+          VERSION="${{ steps.meta.outputs.version }}"
           git tag "v${VERSION}"
           git push origin "v${VERSION}"
 
       - name: Create GitHub Release
+        if: steps.gate.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NOTES="${{ inputs.notes }}"
-          if [ -z "$NOTES" ]; then NOTES="Release v${VERSION}"; fi
+          VERSION="${{ steps.meta.outputs.version }}"
           gh release create "v${VERSION}" \
             --target main \
             --title "v${VERSION}" \
-            --notes "$NOTES"
+            --generate-notes
 
 
