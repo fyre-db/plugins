@@ -147,9 +147,35 @@ describe('BffServerAdapter', () => {
   });
 
   it('tokenRequest throws Error on non-ok response', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 400 });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      text: () => Promise.resolve('invalid_grant'),
+    });
 
     const adapter = new BffServerAdapter(baseConfig);
     await expect(adapter.exchangeCode('bad-code')).rejects.toThrow('Token request failed: 400');
+  });
+
+  it('tokenRequest falls back to "(no body)" when reading the error body fails', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: () => Promise.reject(new Error('stream error')),
+    });
+
+    const adapter = new BffServerAdapter(baseConfig);
+    await expect(adapter.exchangeCode('bad-code')).rejects.toThrow('Token request failed: 500 (no body)');
+  });
+
+  it('tokenRequest handles an empty error body', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      text: () => Promise.resolve(''),
+    });
+
+    const adapter = new BffServerAdapter(baseConfig);
+    await expect(adapter.exchangeCode('bad-code')).rejects.toThrow('Token request failed: 401');
   });
 });

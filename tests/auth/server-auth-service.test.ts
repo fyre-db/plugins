@@ -479,4 +479,54 @@ describe('ServerAuthService', () => {
     const res = await svc.fetch(new Request('https://example.com/api/auth/refresh'));
     expect(res.status).toBe(404);
   });
+
+  it('routes correctly when basePath is empty', async () => {
+    const svc = new ServerAuthService([mockAdapter()], { ...DEFAULT_OPTS, basePath: '' });
+    const res = await svc.fetch(new Request('https://example.com/login?provider=google'));
+    expect(res.status).toBe(302);
+  });
+
+  it('logout: ignores a cookie whose provider is unknown', async () => {
+    const adapter = mockAdapter();
+    const svc = new ServerAuthService([adapter], DEFAULT_OPTS);
+    const cookie = encodeRefreshCookie('unknown-provider', 'rt-tok');
+    const req = new Request('https://example.com/api/auth/logout', {
+      method: 'POST',
+      headers: { Cookie: `refresh=${cookie}` },
+    });
+
+    const res = await svc.fetch(req);
+
+    expect(res.status).toBe(200);
+    expect(adapter.logout).not.toHaveBeenCalled();
+  });
+
+  it('logout: ignores an undecodable refresh cookie', async () => {
+    const adapter = mockAdapter();
+    const svc = new ServerAuthService([adapter], DEFAULT_OPTS);
+    const req = new Request('https://example.com/api/auth/logout', {
+      method: 'POST',
+      headers: { Cookie: 'refresh=%%%not-decodable%%%' },
+    });
+
+    const res = await svc.fetch(req);
+
+    expect(res.status).toBe(200);
+    expect(adapter.logout).not.toHaveBeenCalled();
+  });
+
+  it('refresh: handles a non-Error thrown during feature refresh', async () => {
+    const adapter = mockAdapter();
+    adapter.refresh = vi.fn(async () => {
+      throw 'string failure';
+    });
+    const svc = new ServerAuthService([adapter], DEFAULT_OPTS);
+    const req = refreshRequest('google', 'rt', { refresh_token: 'feat-rt' }, '?feature=gmail&provider=google');
+
+    const res = await svc.fetch(req);
+
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('Feature refresh failed');
+  });
 });

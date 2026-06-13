@@ -100,6 +100,63 @@ describe('GoogleDriveService', () => {
     ).rejects.toThrow(StorageError);
   });
 
+  it('getListing() sets the spaces param for appDataFolder', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ files: [] }));
+
+    const svc = new GoogleDriveService(tokenSupplier());
+    await svc.getListing(GOOGLE_DRIVE_SPACES.appData, null, '');
+
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(url.searchParams.get('spaces')).toBe('appDataFolder');
+    expect(url.searchParams.get('q')).toContain("'appDataFolder' in parents");
+  });
+
+  it('getListing() maps raw drive files to CloudFile entries', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        files: [
+          { id: 'fold', name: 'Folder', mimeType: 'application/vnd.google-apps.folder' },
+          {
+            id: 'mine',
+            name: 'mine.txt',
+            mimeType: 'text/plain',
+            modifiedTime: '2024-01-01T00:00:00Z',
+            size: '128',
+            owners: [{ displayName: 'Me Myself', me: true }],
+          },
+          {
+            id: 'theirs',
+            name: 'theirs.txt',
+            mimeType: 'text/plain',
+            owners: [{ displayName: 'Bob', me: false }],
+          },
+        ],
+      }),
+    );
+
+    const svc = new GoogleDriveService(tokenSupplier());
+    const files = await svc.getListing(GOOGLE_DRIVE_SPACES.myDrive, null, '');
+
+    expect(files[0]).toMatchObject({ id: 'fold', isFolder: true, size: undefined, owner: undefined });
+    expect(files[1]).toMatchObject({ id: 'mine', isFolder: false, size: 128, owner: 'me' });
+    expect(files[2]).toMatchObject({ id: 'theirs', size: undefined, owner: 'Bob' });
+  });
+
+  it('getListing() adds no parent filter for an unknown space with no parentId', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ files: [] }));
+    const svc = new GoogleDriveService(tokenSupplier());
+    await svc.getListing({ id: 'custom', displayName: 'Custom' }, null, '');
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(url.searchParams.get('q')).toBe('trashed=false');
+  });
+
+  it('getListing() treats a missing files array as empty', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}));
+    const svc = new GoogleDriveService(tokenSupplier());
+    const files = await svc.getListing(GOOGLE_DRIVE_SPACES.myDrive, null, '');
+    expect(files).toEqual([]);
+  });
+
   // --- createFolder ---
 
   it('createFolder() posts to Drive API with name and parents', async () => {
@@ -126,6 +183,34 @@ describe('GoogleDriveService', () => {
     await expect(
       svc.createFolder(GOOGLE_DRIVE_SPACES.sharedWithMe, 'Folder', null),
     ).rejects.toThrow(FyreDbPluginConfigError);
+  });
+
+  it('createFolder() uses appDataFolder as parent when no parentId in appData space', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ id: 'ad', name: 'F', mimeType: 'application/vnd.google-apps.folder' }),
+    );
+    const svc = new GoogleDriveService(tokenSupplier());
+    await svc.createFolder(GOOGLE_DRIVE_SPACES.appData, 'F', null);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.parents).toEqual(['appDataFolder']);
+  });
+
+  it('createFolder() uses root as parent when no parentId in myDrive space', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ id: 'r', name: 'F', mimeType: 'application/vnd.google-apps.folder' }),
+    );
+    const svc = new GoogleDriveService(tokenSupplier());
+    await svc.createFolder(GOOGLE_DRIVE_SPACES.myDrive, 'F', null);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.parents).toEqual(['root']);
+  });
+
+  it('createFolder() throws StorageError on non-ok response', async () => {
+    mockFetch.mockResolvedValueOnce(errorResponse(500, 'Server Error'));
+    const svc = new GoogleDriveService(tokenSupplier());
+    await expect(
+      svc.createFolder(GOOGLE_DRIVE_SPACES.myDrive, 'F', 'parent'),
+    ).rejects.toThrow(StorageError);
   });
 
   // --- requireToken ---

@@ -51,14 +51,28 @@ describe('withGzip', () => {
     expect(result).toEqual(input);
   });
 
-  it.skip('produces valid gzip on inner adapter (starts with gzip magic bytes)', async () => {
+  it('writes a marker followed by valid gzip on the inner adapter', async () => {
     const inner = new MemoryStorageAdapter();
     const adapter = withGzip(inner);
     const input = new TextEncoder().encode('test');
     await adapter.write(undefined, 'test', input);
     const raw = await inner.read(undefined, 'test');
-    expect(raw![0]).toBe(0x1f);
-    expect(raw![1]).toBe(0x8b);
+    // 3-byte fyredb gzip marker (\0GZ)
+    expect(raw![0]).toBe(0x00);
+    expect(raw![1]).toBe(0x47);
+    expect(raw![2]).toBe(0x5a);
+    // Followed by the gzip magic bytes
+    expect(raw![3]).toBe(0x1f);
+    expect(raw![4]).toBe(0x8b);
+  });
+
+  it('returns legacy uncompressed data without a marker as-is', async () => {
+    const inner = new MemoryStorageAdapter();
+    const legacy = new TextEncoder().encode('plain legacy data');
+    await inner.write(undefined, 'legacy', legacy);
+    const adapter = withGzip(inner);
+    const result = await adapter.read(undefined, 'legacy');
+    expect(result).toEqual(legacy);
   });
 
   it('read returns null for missing key', async () => {

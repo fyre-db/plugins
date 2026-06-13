@@ -1,6 +1,6 @@
 {
   "name": "@fyre-db/plugins",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "External-service adapters for @fyre-db/core — cloud storage, local persistence, and encryption implementations",
   "homepage": "https://github.com/fyre-db/plugins#readme",
   "bugs": {

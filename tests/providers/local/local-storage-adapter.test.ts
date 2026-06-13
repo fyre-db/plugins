@@ -114,6 +114,23 @@ describe('LocalStorageAdapter', () => {
         globalThis.localStorage.setItem = orig;
       }
     });
+
+    it('wraps non-Error throws from setItem', async () => {
+      const orig = globalThis.localStorage.setItem;
+      globalThis.localStorage.setItem = () => { throw 'string failure'; };
+      try {
+        let caught: unknown;
+        try {
+          await adapter.write(tenant, 'k', new Uint8Array([1]));
+        } catch (e) {
+          caught = e;
+        }
+        expect(caught).toBeInstanceOf(StorageError);
+        expect((caught as StorageError).message).toContain('string failure');
+      } finally {
+        globalThis.localStorage.setItem = orig;
+      }
+    });
   });
 
   it('throws when localStorage is unavailable', () => {

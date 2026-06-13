@@ -47,6 +47,27 @@ describe('CloudService', () => {
     cs.dispose();
   });
 
+  it('active$ emits null when signed-in name has no registered adapter', async () => {
+    const { state$, service } = mockAuth({ status: 'loading' });
+    const cs = new CloudService([mockAdapter('google')], service);
+
+    state$.next({ status: 'signed-in', name: 'dropbox' });
+
+    expect(cs.active).toBeNull();
+    cs.dispose();
+  });
+
+  it('active$ emits null when signed-in state has no name', async () => {
+    const google = mockAdapter('google');
+    const { state$, service } = mockAuth({ status: 'signed-in', name: 'google' });
+    const cs = new CloudService([google], service);
+
+    state$.next({ status: 'signed-in' } as AuthState);
+
+    expect(cs.active).toBeNull();
+    cs.dispose();
+  });
+
   it('active$ emits null when state transitions to signed-out', async () => {
     const { state$, service } = mockAuth({ status: 'signed-in', name: 'google' });
     const cs = new CloudService([mockAdapter('google')], service);

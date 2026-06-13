@@ -345,6 +345,44 @@ describe('GoogleDriveAdapter', () => {
 
       await expect(adapter.read(badTenant, 'k')).rejects.toThrow('requires meta.folderId');
     });
+
+    it('throws when sharedWithMe space tenant lacks folderId', async () => {
+      const badTenant = makeTenant({ meta: { space: 'sharedWithMe' } });
+
+      await expect(adapter.read(badTenant, 'k')).rejects.toThrow('requires meta.folderId');
+    });
+  });
+
+  describe('access token', () => {
+    it('throws when getToken returns null', async () => {
+      getToken.mockResolvedValueOnce(null);
+      await expect(adapter.read(appDataTenant, 'k')).rejects.toThrow('No access token available');
+    });
+
+    it('throws when token name is not google', async () => {
+      getToken.mockResolvedValueOnce({ name: 'dropbox', token: 't' });
+      await expect(adapter.read(appDataTenant, 'k')).rejects.toThrow('Expected google access token');
+    });
+  });
+
+  describe('space without a folder parent', () => {
+    // A space that is neither appDataFolder nor carries a folderId leaves the
+    // parent unset on create and omits the parent clause when resolving.
+    const noParentTenant = makeTenant({ id: 'no-parent', meta: { space: 'personal' } });
+
+    it('omits the parent clause and creates without a parent', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse({ files: [] }));
+      mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'new-1' }));
+
+      await adapter.write(noParentTenant, 'doc', new Uint8Array([1]));
+
+      const resolveUrl = new URL(mockFetch.mock.calls[0][0] as string);
+      expect(resolveUrl.searchParams.get('q')).not.toContain('in parents');
+
+      const body = mockFetch.mock.calls[1][1].body as Uint8Array;
+      const bodyText = new TextDecoder().decode(body);
+      expect(bodyText).not.toContain('"parents"');
+    });
   });
 
   describe('authorization', () => {

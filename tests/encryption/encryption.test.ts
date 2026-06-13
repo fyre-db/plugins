@@ -102,6 +102,14 @@ describe('Pbkdf2EncryptionService', () => {
     expect(decrypted).toEqual(data);
   });
 
+  it('loadKeyData throws when dek is not a base64 string', async () => {
+    const svc = createService();
+    const keys = await svc.deriveKeys('password', appId);
+    await expect(svc.loadKeyData(keys, { dek: 123 })).rejects.toThrow(
+      'Invalid key data: expected dek to be a base64 string',
+    );
+  });
+
   it('rekey re-wraps DEK under new credential', async () => {
     const svc = createService();
     let keys = await svc.deriveKeys('old-password', appId);

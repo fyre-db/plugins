@@ -96,4 +96,72 @@ describe('BffClientAdapter', () => {
     void newAdapter().login();
     expect(mockLocation.href).toBe(LOGIN_URL);
   });
+
+  it('login with a feature appends the feature query param', () => {
+    void newAdapter().login('drive');
+    expect(mockLocation.href).toBe(`${LOGIN_URL}&feature=drive`);
+  });
+
+  it('refresh with a feature posts the refresh token in the body', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ access_token: 'feat-at', expires_in: 1800, name: 'google' }),
+    );
+    const r = await newAdapter().refresh('drive', 'rt-feature');
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${REFRESH_URL}?provider=google&feature=drive`);
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(init.body as string)).toEqual({ refresh_token: 'rt-feature' });
+    expect(r?.token).toBe('feat-at');
+  });
+
+  it('refresh falls back to adapter name when response omits name', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ access_token: 'tok', expires_in: 3600 }));
+    const r = await newAdapter().refresh();
+    expect(r?.name).toBe('google');
+  });
+
+  it('handleCallback parses tokens from the URL hash and clears it', () => {
+    const replaceState = vi.fn();
+    vi.stubGlobal('window', {
+      location: {
+        hash: '#access_token=at&refresh_token=rt&expires_in=1200&feature=drive&provider=google',
+        pathname: '/callback',
+      },
+      history: { replaceState },
+    });
+    const creds = newAdapter().handleCallback();
+    expect(creds).toMatchObject({
+      accessToken: 'at',
+      refreshToken: 'rt',
+      expiresIn: 1200,
+      feature: 'drive',
+      provider: 'google',
+    });
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/callback');
+  });
+
+  it('handleCallback defaults expiresIn to 3600 when absent', () => {
+    vi.stubGlobal('window', {
+      location: {
+        hash: '#access_token=at&refresh_token=rt&feature=drive&provider=google',
+        pathname: '/callback',
+      },
+      history: { replaceState: vi.fn() },
+    });
+    const creds = newAdapter().handleCallback();
+    expect(creds?.expiresIn).toBe(3600);
+  });
+
+  it('handleCallback returns null when the hash is empty', () => {
+    vi.stubGlobal('window', { location: { hash: '', pathname: '/callback' }, history: { replaceState: vi.fn() } });
+    expect(newAdapter().handleCallback()).toBeNull();
+  });
+
+  it('handleCallback returns null when required params are missing', () => {
+    vi.stubGlobal('window', {
+      location: { hash: '#access_token=at', pathname: '/callback' },
+      history: { replaceState: vi.fn() },
+    });
+    expect(newAdapter().handleCallback()).toBeNull();
+  });
 });
