@@ -1,37 +1,50 @@
 {
-  "name": "strata-adapters",
-  "version": "0.1.2",
-  "description": "External-service adapters for strata-data-sync — cloud storage, local persistence, and encryption implementations",
-  "homepage": "https://github.com/abhayjatindoshi/strata-adapters#readme",
+  "name": "@fyre-db/plugins",
+  "version": "0.0.0",
+  "description": "External-service adapters for @fyre-db/core — cloud storage, local persistence, and encryption implementations",
+  "homepage": "https://github.com/fyre-db/plugins#readme",
   "bugs": {
-    "url": "https://github.com/abhayjatindoshi/strata-adapters/issues"
+    "url": "https://github.com/fyre-db/plugins/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/abhayjatindoshi/strata-adapters.git"
+    "url": "git+https://github.com/fyre-db/plugins.git"
   },
   "license": "MIT",
   "author": "Abhay Jatin Doshi <ajd1996@hotmail.com>",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "dev": "tsc -p tsconfig.build.json --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint .",
     "test": "vitest run"
   },
   "peerDependencies": {
-    "strata-data-sync": "^0.1.0"
+    "rxjs": "^7.8.2",
+    "@fyre-db/core": "^0.1.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/debug": "^4.1.13",
     "@types/node": "^25.5.0",
     "@vitest/coverage-v8": "^4.1.1",
-    "strata-data-sync": "^0.1.0",
-    "typescript": "^5.9.3",
+    "eslint": "^10.2.1",
+    "rxjs": "^7.8.2",
+    "@fyre-db/core": "^0.1.0",
+    "tsup": "^8",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.59.1",
     "vitest": "^4.1.0"
   },
   "dependencies": {

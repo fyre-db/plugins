@@ -15,12 +15,22 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: 24
+          registry-url: https://registry.npmjs.org
 
-      - run: npm ci
+      - run: npm install
+
+      - run: npm run lint
 
       - run: npx vitest run --coverage --reporter=default --reporter=json --outputFile=test-results.json
+
+      - run: npm run build
+
+      # Packaging validation — green CI ⟹ publishable. Validates the exact
+      # tarball (files globs, exports, dist present) without contacting the
+      # registry, so it does not fail on the placeholder 0.0.0 version. The
+      # release workflow handles version-uniqueness separately.
+      - run: npm pack --dry-run
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

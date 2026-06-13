@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
-      '@strata-adapters': path.resolve(__dirname, 'src'),
+      '@/': path.resolve(__dirname, 'src') + '/',
     },
   },
   test: {
@@ -16,6 +16,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json'],
       include: ['src/**/*.ts'],
+      // CI gate: fail the run if coverage drops below 97% on any metric.
+      thresholds: {
+        statements: 97,
+        branches: 97,
+        functions: 97,
+        lines: 97,
+      },
     },
   },
 });

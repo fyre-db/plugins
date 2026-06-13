@@ -1,4 +1,6 @@
-export { LocalStorageAdapter } from './adapters/index';
-export { withGzip, withRetry } from './transforms/index';
-export type { RetryOptions } from './transforms/index';
-export { InvalidEncryptionKeyError, AesGcmEncryptionStrategy, Pbkdf2EncryptionService } from './encryption/index';
+export * from './providers/index';
+export * from './transforms/index';
+export * from './encryption/index';
+export * from './errors/index';
+export * from './auth/index';
+export * from './cloud/index';

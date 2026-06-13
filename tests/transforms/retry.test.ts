@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { MemoryStorageAdapter } from 'strata-data-sync';
-import { withRetry } from '../../src/transforms/retry';
+import { MemoryStorageAdapter } from '@fyre-db/core';
+import { FyreDbError } from '@fyre-db/core';
+import { withRetry } from '@/transforms/retry';
+import { StorageError } from '@/errors/fyredb-error';
 
 describe('withRetry', () => {
   it('passes through successful read', async () => {
@@ -89,5 +91,41 @@ describe('withRetry', () => {
     const adapter = withRetry(inner, { delayMs: 1 });
     const result = await adapter.read(undefined, 'k');
     expect(result).toBeNull();
+  });
+
+  it('does not retry a non-retryable FyreDbError', async () => {
+    let attempts = 0;
+    const inner: any = {
+      read: async () => {
+        attempts++;
+        throw new FyreDbError('fatal', { kind: 'permission-denied', retryable: false });
+      },
+    };
+    const adapter = withRetry(inner, { maxRetries: 3, delayMs: 1 });
+    await expect(adapter.read(undefined, 'k')).rejects.toThrow('fatal');
+    expect(attempts).toBe(1);
+  });
+
+  it('honours retryAfterMs from a StorageError when computing the delay', async () => {
+    let attempts = 0;
+    const inner: any = {
+      read: async () => {
+        attempts++;
+        if (attempts < 2) {
+          throw new StorageError('slow down', { kind: 'rate-limited', retryable: true, retryAfterMs: 5 });
+        }
+        return new Uint8Array([7]);
+      },
+    };
+    const adapter = withRetry(inner, { maxRetries: 2, delayMs: 1000 });
+    const result = await adapter.read(undefined, 'k');
+    expect(result).toEqual(new Uint8Array([7]));
+    expect(attempts).toBe(2);
+  });
+
+  it('throws a fallback StorageError when maxRetries is negative', async () => {
+    const inner: any = { read: async () => new Uint8Array([1]) };
+    const adapter = withRetry(inner, { maxRetries: -1 });
+    await expect(adapter.read(undefined, 'k')).rejects.toThrow('retry failed');
   });
 });

@@ -1,10 +1,25 @@
-import type { StorageAdapter, Tenant } from 'strata-data-sync';
+import type { StorageAdapter, Tenant } from '@fyre-db/core';
+import { FyreDbError } from '@fyre-db/core';
+import { StorageError } from '../errors/fyredb-error';
+import { log } from '@/log';
 
 export type RetryOptions = {
   readonly maxRetries?: number;
   readonly delayMs?: number;
   readonly onRetry?: (attempt: number, error: Error) => void;
 };
+
+function isRetryable(err: unknown): boolean {
+  if (err instanceof FyreDbError) return err.retryable;
+  return true;
+}
+
+function getRetryDelay(err: unknown, attempt: number, baseDelayMs: number): number {
+  if (err instanceof StorageError && err.retryAfterMs) {
+    return err.retryAfterMs;
+  }
+  return baseDelayMs * Math.pow(2, attempt) * (0.5 + Math.random());
+}
 
 async function withRetries<T>(
   fn: () => Promise<T>,
@@ -18,18 +33,24 @@ async function withRetries<T>(
     try {
       return await fn();
     } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt < maxRetries) {
+      lastError = err instanceof Error ? err : new FyreDbError(String(err), { kind: 'unknown' });
+      if (attempt < maxRetries && isRetryable(err)) {
+        const delay = getRetryDelay(err, attempt, delayMs);
+        log.transform('retry attempt %d/%d (delay=%dms): %s', attempt + 1, maxRetries, Math.round(delay), lastError.message);
         options.onRetry?.(attempt + 1, lastError);
-        await new Promise(r => setTimeout(r, delayMs * Math.pow(2, attempt)));
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        throw lastError;
       }
     }
   }
-  throw lastError;
+  log.transform.error('giving up after %d attempts', maxRetries + 1);
+  throw lastError ?? new StorageError('retry failed', { kind: 'unknown' });
 }
 
 export function withRetry(adapter: StorageAdapter, options: RetryOptions = {}): StorageAdapter {
   return {
+    ...adapter,
     async read(tenant: Tenant | undefined, key: string): Promise<Uint8Array | null> {
       return withRetries(() => adapter.read(tenant, key), options);
     },

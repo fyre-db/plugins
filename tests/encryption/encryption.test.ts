@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { InvalidEncryptionKeyError } from 'strata-data-sync';
-import { Pbkdf2EncryptionService, AesGcmEncryptionStrategy } from '../../src/encryption/index';
+import { InvalidEncryptionKeyError } from '@fyre-db/core';
+import { Pbkdf2EncryptionService, AesGcmEncryptionStrategy } from '@/encryption/index';
 
 describe('Pbkdf2EncryptionService', () => {
   const appId = 'test-app';
@@ -42,27 +42,27 @@ describe('Pbkdf2EncryptionService', () => {
     await expect(svc.decrypt('task.global', data, keys)).rejects.toThrow('DEK not loaded');
   });
 
-  it('encrypts/decrypts __strata with KEK even when DEK is null', async () => {
+  it('encrypts/decrypts __fyredb with KEK even when DEK is null', async () => {
     const svc = createService();
     const keys = await svc.deriveKeys('password', appId);
     const data = new TextEncoder().encode('marker data');
-    const encrypted = await svc.encrypt('__strata', data, keys);
+    const encrypted = await svc.encrypt('__fyredb', data, keys);
     expect(encrypted).not.toEqual(data);
     // First 16 bytes are the salt prefix, then version byte at offset 16
     expect(encrypted.length).toBeGreaterThan(16);
     expect(encrypted[16]).toBe(1); // version byte after salt
-    const decrypted = await svc.decrypt('__strata', encrypted, keys);
+    const decrypted = await svc.decrypt('__fyredb', encrypted, keys);
     expect(decrypted).toEqual(data);
   });
 
-  it('wrong credential fails to decrypt __strata', async () => {
+  it('wrong credential fails to decrypt __fyredb', async () => {
     const svc = createService();
     const keys1 = await svc.deriveKeys('correct', appId);
     const data = new TextEncoder().encode('secret');
-    const encrypted = await svc.encrypt('__strata', data, keys1);
+    const encrypted = await svc.encrypt('__fyredb', data, keys1);
 
     const keys2 = await svc.deriveKeys('wrong', appId);
-    await expect(svc.decrypt('__strata', encrypted, keys2))
+    await expect(svc.decrypt('__fyredb', encrypted, keys2))
       .rejects.toThrow(InvalidEncryptionKeyError);
   });
 
@@ -102,6 +102,14 @@ describe('Pbkdf2EncryptionService', () => {
     expect(decrypted).toEqual(data);
   });
 
+  it('loadKeyData throws when dek is not a base64 string', async () => {
+    const svc = createService();
+    const keys = await svc.deriveKeys('password', appId);
+    await expect(svc.loadKeyData(keys, { dek: 123 })).rejects.toThrow(
+      'Invalid key data: expected dek to be a base64 string',
+    );
+  });
+
   it('rekey re-wraps DEK under new credential', async () => {
     const svc = createService();
     let keys = await svc.deriveKeys('old-password', appId);
@@ -127,13 +135,13 @@ describe('Pbkdf2EncryptionService', () => {
 
   it('deriveKeys reuses salt from rawMarkerBytes', async () => {
     const svc = createService();
-    // First derive to get a salt via __strata round-trip
+    // First derive to get a salt via __fyredb round-trip
     const keys1 = await svc.deriveKeys('password', appId);
     const data = new TextEncoder().encode('marker');
-    const encrypted = await svc.encrypt('__strata', data, keys1);
+    const encrypted = await svc.encrypt('__fyredb', data, keys1);
     // encrypted starts with 16-byte salt; pass it as rawMarkerBytes
     const keys2 = await svc.deriveKeys('password', appId, encrypted);
-    const decrypted = await svc.decrypt('__strata', encrypted, keys2);
+    const decrypted = await svc.decrypt('__fyredb', encrypted, keys2);
     expect(decrypted).toEqual(data);
   });
 

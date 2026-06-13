@@ -6,8 +6,8 @@ import {
   importAesGcmKey,
   aesGcmEncrypt,
   aesGcmDecrypt,
-} from 'strata-data-sync';
-import { InvalidEncryptionKeyError } from 'strata-data-sync';
+} from '@/encryption/crypto';
+import { InvalidEncryptionKeyError } from '@fyre-db/core';
 
 describe('Encryption primitives', () => {
   const appId = 'test-app';
@@ -98,6 +98,21 @@ describe('Encryption primitives', () => {
       const plaintext = new Uint8Array([1, 2, 3]);
       const ciphertext = await aesGcmEncrypt(plaintext, dek);
       expect(ciphertext[0]).toBe(1); // version 1
+    });
+
+    it('decrypt rejects when data is too short', async () => {
+      const dek = await aesGcmGenerateKey();
+      await expect(aesGcmDecrypt(new Uint8Array([1, 0, 0]), dek)).rejects.toThrow(
+        'Encrypted data too short',
+      );
+    });
+
+    it('decrypt rejects on an unsupported version byte', async () => {
+      const dek = await aesGcmGenerateKey();
+      const plaintext = new TextEncoder().encode('hello world payload');
+      const ciphertext = await aesGcmEncrypt(plaintext, dek);
+      ciphertext[0] = 99; // corrupt the version byte
+      await expect(aesGcmDecrypt(ciphertext, dek)).rejects.toThrow('Unsupported encryption version');
     });
   });
 });

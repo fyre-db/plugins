@@ -1,10 +1,9 @@
-import debug from 'debug';
-import type { EncryptionStrategy, EncryptionService, EncryptionKeys } from 'strata-data-sync';
+import type { EncryptionStrategy, EncryptionService, EncryptionKeys } from '@fyre-db/core';
 import {
   pbkdf2DeriveKeyWithSalt, aesGcmGenerateKey, exportCryptoKey, importAesGcmKey,
-} from 'strata-data-sync';
-
-const log = debug('strata:encryption');
+} from './crypto';
+import { EncryptionError } from './errors';
+import { log } from '@/log';
 
 const SALT_LENGTH = 16;
 
@@ -29,18 +28,18 @@ export class Pbkdf2EncryptionService implements EncryptionService {
     this.targets = options.targets;
     this.strategy = options.strategy;
     this.tenantKey = options.tenantKey ?? '__tenants';
-    this.markerKey = options.markerKey ?? '__strata';
+    this.markerKey = options.markerKey ?? '__fyredb';
   }
 
-  private castKeys(keys: EncryptionKeys | null): Pbkdf2Keys | null {
+  private castKeys(keys: EncryptionKeys): Pbkdf2Keys | null {
     if (keys === null) return null;
     if (typeof keys !== 'object' || !('kek' in (keys as Record<string, unknown>))) {
-      throw new Error('Invalid encryption keys: expected Pbkdf2Keys with kek property');
+      throw new EncryptionError('Invalid encryption keys: expected Pbkdf2Keys with kek property', { kind: 'invalid-key-data' });
     }
     return keys as Pbkdf2Keys;
   }
 
-  async encrypt(blobKey: string, data: Uint8Array, keys: EncryptionKeys | null): Promise<Uint8Array> {
+  async encrypt(blobKey: string, data: Uint8Array, keys: EncryptionKeys): Promise<Uint8Array> {
     if (blobKey === this.tenantKey) return data;
     const k = this.castKeys(keys);
     if (!k) return data;
@@ -51,11 +50,11 @@ export class Pbkdf2EncryptionService implements EncryptionService {
       result.set(ciphertext, SALT_LENGTH);
       return result;
     }
-    if (!k.dek) throw new Error('DEK not loaded — cannot encrypt partition data');
+    if (!k.dek) throw new EncryptionError('DEK not loaded — cannot encrypt partition data', { kind: 'dek-not-loaded' });
     return this.strategy.encrypt(data, k.dek);
   }
 
-  async decrypt(blobKey: string, data: Uint8Array, keys: EncryptionKeys | null): Promise<Uint8Array> {
+  async decrypt(blobKey: string, data: Uint8Array, keys: EncryptionKeys): Promise<Uint8Array> {
     if (blobKey === this.tenantKey) return data;
     const k = this.castKeys(keys);
     if (!k) return data;
@@ -63,7 +62,7 @@ export class Pbkdf2EncryptionService implements EncryptionService {
       const ciphertext = data.slice(SALT_LENGTH);
       return this.strategy.decrypt(ciphertext, k.kek);
     }
-    if (!k.dek) throw new Error('DEK not loaded — cannot decrypt partition data');
+    if (!k.dek) throw new EncryptionError('DEK not loaded — cannot decrypt partition data', { kind: 'dek-not-loaded' });
     return this.strategy.decrypt(data, k.dek);
   }
 
@@ -80,7 +79,7 @@ export class Pbkdf2EncryptionService implements EncryptionService {
     fullSalt.set(salt, 0);
     fullSalt.set(appIdBytes, salt.length);
     const kek = await pbkdf2DeriveKeyWithSalt(credential, fullSalt);
-    log('KEK derived for app %s', appId);
+    log.crypto('KEK derived for app %s', appId);
     return { kek, dek: null, salt } satisfies Pbkdf2Keys;
   }
 
@@ -96,13 +95,16 @@ export class Pbkdf2EncryptionService implements EncryptionService {
 
   async loadKeyData(keys: EncryptionKeys, data: Record<string, unknown>): Promise<EncryptionKeys> {
     const k = keys as Pbkdf2Keys;
-    const dek = await importAesGcmKey(data.dek as string);
+    if (typeof data.dek !== 'string') {
+      throw new EncryptionError('Invalid key data: expected dek to be a base64 string', { kind: 'invalid-key-data' });
+    }
+    const dek = await importAesGcmKey(data.dek);
     return { kek: k.kek, dek, salt: k.salt } satisfies Pbkdf2Keys;
   }
 
   async rekey(keys: EncryptionKeys, credential: string, appId: string): Promise<{ keys: EncryptionKeys; keyData: Record<string, unknown> }> {
     const k = keys as Pbkdf2Keys;
-    if (!k.dek) throw new Error('No DEK loaded — cannot rekey');
+    if (!k.dek) throw new EncryptionError('No DEK loaded — cannot rekey', { kind: 'dek-not-loaded' });
     const textEncoder = new TextEncoder();
     const newSalt = globalThis.crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
     const appIdBytes = textEncoder.encode(appId);
