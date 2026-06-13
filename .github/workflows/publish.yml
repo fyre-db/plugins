@@ -1,46 +1,108 @@
-name: Publish to npm
+name: Release & Publish
+
+# Manually triggered release for @fyre-db/plugins.
+# You provide the version + release notes; this workflow validates, publishes to
+# npm (with provenance), tags the current main commit, and creates the GitHub
+# Release. The version bump is *ephemeral* — package.json is bumped only inside
+# the runner for the publish; it is never committed back to main. The git tag is
+# the source of truth for the released version. main/package.json stays at the
+# placeholder 0.0.0.
+#
+# Requirements:
+#   - Runs only from `main`.
+#   - npm Trusted Publishing (OIDC) configured for @fyre-db/plugins (no npm token).
+#   - No push to a protected branch — no secret/PAT/bypass needed.
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 0.1.0 — no leading v)"
+        required: true
+        type: string
+      notes:
+        description: "Release notes (markdown)"
+        required: false
+        type: string
 
 permissions:
-  id-token: write
-  contents: read
+  id-token: write # OIDC for npm provenance
+  contents: write # create the git tag + GitHub Release (no branch push)
 
 concurrency:
-  group: publish-${{ github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
+    # Hard guard: only ever release from main.
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate version input
+        run: |
+          VERSION="${{ inputs.version }}"
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$VERSION' is not a valid semver version (expected e.g. 0.1.0)."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - run: npm ci
-      - run: npx vitest run
-      - run: npm run build
+      - run: npm install
 
-      - name: Check if version already published
-        id: version-check
+      - name: Guard — version not already published
         run: |
-          PACKAGE_NAME=$(node -p "require('./package.json').name")
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          PUBLISHED=$(npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version 2>/dev/null || true)
-          if [ "$PUBLISHED" = "$PACKAGE_VERSION" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Version ${PACKAGE_VERSION} already published, skipping."
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "Version ${PACKAGE_VERSION} not yet published."
+          NAME=$(node -p "require('./package.json').name")
+          PUBLISHED=$(npm view "${NAME}@${VERSION}" version 2>/dev/null || true)
+          if [ "$PUBLISHED" = "$VERSION" ]; then
+            echo "::error::${NAME}@${VERSION} is already published to npm."
+            exit 1
           fi
 
+      - name: Guard — git tag does not already exist
+        run: |
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "::error::Tag v${VERSION} already exists."
+            exit 1
+          fi
+
+      # Full validation before any irreversible step.
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+
+      - name: Ephemeral version bump (runner-only, not committed)
+        run: npm version "$VERSION" --no-git-tag-version
+
+      - run: npm publish --dry-run --access public
+
       - name: Publish to npm
-        if: steps.version-check.outputs.skip != 'true'
         run: npm publish --provenance --access public
+
+      - name: Tag the released main commit
+        run: |
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="${{ inputs.notes }}"
+          if [ -z "$NOTES" ]; then NOTES="Release v${VERSION}"; fi
+          gh release create "v${VERSION}" \
+            --target main \
+            --title "v${VERSION}" \
+            --notes "$NOTES"
+
+
