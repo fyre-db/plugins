@@ -279,9 +279,9 @@ export class FyreDbApp {
       encryptionService: this.encryptionService,
     });
     this.dbInstance = db;
-    this.dbSubs.push(db.tenants.activeTenant$.subscribe((t) => this.tenant$$.next(t)));
-    this.dbSubs.push(db.tenants.tenants$.subscribe((list) => this.tenants$$.next(list)));
-    this.dbSubs.push(db.observe('error').subscribe((e) => this.errorSubject.next(e)));
+    this.dbSubs.push(db.tenants.activeTenant$.subscribe((t) => { this.tenant$$.next(t); }));
+    this.dbSubs.push(db.tenants.tenants$.subscribe((list) => { this.tenants$$.next(list); }));
+    this.dbSubs.push(db.observe('error').subscribe((e) => { this.errorSubject.next(e); }));
   }
 
   private async teardownDb(): Promise<void> {
