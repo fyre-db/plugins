@@ -11,6 +11,7 @@ function createLogger(module: string) {
 }
 
 export const log = {
+  app: createLogger('app'),
   auth: createLogger('auth'),
   cloud: createLogger('cloud'),
   crypto: createLogger('crypto'),
