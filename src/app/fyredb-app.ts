@@ -19,7 +19,7 @@ import type { ClientAuthService } from '@/auth/client-auth-service';
 import type { AuthState } from '@/auth/types';
 import type { CloudAdapter } from '@/cloud/cloud-service';
 import { FyreDbPluginConfigError } from '@/errors/fyredb-error';
-import { CredentialCache } from './credential-cache';
+import type { StorageSlot } from '@/storage';
 import { log } from '@/log';
 
 /** The unified lifecycle state the UI renders from. */
@@ -40,7 +40,8 @@ export type Session = {
 
 export type FyreDbAppConfig = {
   readonly appId: string;
-  readonly deviceId?: string;
+  /** Stable per-device id (sync identity). The app owns its persistence. */
+  readonly deviceId: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly entities: ReadonlyArray<EntityDefinition<any>>;
   readonly migrations?: ReadonlyArray<BlobMigration>;
@@ -51,20 +52,11 @@ export type FyreDbAppConfig = {
   readonly auth?: ClientAuthService;
   /** Named cloud adapters; `name` matches the auth adapter name. */
   readonly providers?: readonly CloudAdapter[];
-  /** sessionStorage key for caching unlock credentials across refreshes. */
-  readonly credentialCacheKey?: string;
+  /** Where to cache the encrypted-tenant unlock credential. Omit to disable. */
+  readonly credential?: StorageSlot;
 };
 
 const LOCAL_PROVIDER = 'local';
-
-function getOrCreateDeviceId(appId: string): string {
-  const key = `${appId}_device_id`;
-  const existing = localStorage.getItem(key);
-  if (existing) return existing;
-  const id = crypto.randomUUID();
-  localStorage.setItem(key, id);
-  return id;
-}
 
 /**
  * Single long-lived handle that owns the two runtime axes — the active
@@ -83,7 +75,7 @@ export class FyreDbApp {
   private readonly encryptionService?: EncryptionService;
   private readonly authService?: ClientAuthService;
   private readonly cloudByName: ReadonlyMap<string, CloudAdapter>;
-  private readonly credentialCache: CredentialCache;
+  private readonly credentialSlot: StorageSlot | null;
 
   private dbInstance: FyreDb | null = null;
   private dbSubs: Subscription[] = [];
@@ -111,7 +103,7 @@ export class FyreDbApp {
 
   constructor(config: FyreDbAppConfig) {
     this.appId = config.appId;
-    this.deviceId = config.deviceId ?? getOrCreateDeviceId(config.appId);
+    this.deviceId = config.deviceId;
     this.entities = config.entities;
     this.migrations = config.migrations;
     this.localAdapter = config.localAdapter ?? new LocalStorageAdapter(config.appId);
@@ -121,7 +113,7 @@ export class FyreDbApp {
         : config.encryption ?? new Pbkdf2EncryptionService({ targets: ['cloud'], strategy: new AesGcmEncryptionStrategy() });
     this.authService = config.auth;
     this.cloudByName = new Map((config.providers ?? []).map((a) => [a.name, a]));
-    this.credentialCache = new CredentialCache(config.credentialCacheKey, this.deviceId);
+    this.credentialSlot = config.credential ?? null;
 
     if (this.authService) {
       this.authSub = this.authService.state$.subscribe((state) => {
@@ -158,7 +150,7 @@ export class FyreDbApp {
   }
 
   async signOut(): Promise<void> {
-    this.credentialCache.clear();
+    this.clearCredential();
     if (this.authService) {
       await this.authService.logout(); // → state$ 'signed-out' → teardown
     } else {
@@ -191,7 +183,7 @@ export class FyreDbApp {
     return this.enqueue(async () => {
       if (!this.dbInstance) return;
       await this.dbInstance.tenants.close();
-      this.credentialCache.clear();
+      this.clearCredential();
       this.pendingUnlockTenant = null;
       this.session$$.next(null);
       this.setStatus('no-tenant');
@@ -204,7 +196,7 @@ export class FyreDbApp {
 
   async removeTenant(id: string, opts?: { purge?: boolean }): Promise<void> {
     await this.db.tenants.remove(id, opts);
-    this.credentialCache.clear();
+    this.clearCredential();
   }
 
   async dispose(): Promise<void> {
@@ -300,10 +292,10 @@ export class FyreDbApp {
     const db = this.dbInstance;
     if (!db) throw new FyreDbPluginConfigError('FyreDbApp: no active provider');
     this.setStatus('opening');
-    const cred = credential ?? this.credentialCache.read(id);
+    const cred = credential ?? this.readCachedCredential(id);
     try {
       await db.tenants.open(id, cred ? { credential: cred } : undefined);
-      if (cred) this.credentialCache.write(id, cred);
+      if (cred) this.cacheCredential(id, cred);
       this.pendingUnlockTenant = null;
       const tenant = db.tenants.activeTenant;
       if (tenant) this.session$$.next({ id: ++this.sessionCounter, tenant });
@@ -319,6 +311,33 @@ export class FyreDbApp {
       this.setStatus('error');
       log.app.error('open %s failed: %s', id, err instanceof Error ? err.message : String(err));
     }
+  }
+
+  /**
+   * Tenant-scoped unlock-credential cache over the configured `StorageSlot`.
+   * Stored as `{ tenantId, credential }` so a cached credential is only reused
+   * for the tenant it belongs to. No-ops when no slot is configured.
+   */
+  private readCachedCredential(tenantId: string): string | undefined {
+    const raw = this.credentialSlot?.get();
+    if (!raw) return undefined;
+    try {
+      const decoded = JSON.parse(raw) as { tenantId?: string; credential?: string };
+      if (decoded.tenantId === tenantId && typeof decoded.credential === 'string') {
+        return decoded.credential;
+      }
+    } catch {
+      /* best-effort */
+    }
+    return undefined;
+  }
+
+  private cacheCredential(tenantId: string, credential: string): void {
+    this.credentialSlot?.set(JSON.stringify({ tenantId, credential }));
+  }
+
+  private clearCredential(): void {
+    this.credentialSlot?.clear();
   }
 
   private setStatus(s: FyreDbStatus): void {

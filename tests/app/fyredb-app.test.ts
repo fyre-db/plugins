@@ -6,6 +6,7 @@ import { FyreDbPluginConfigError } from '@/errors/fyredb-error';
 import type { ClientAuthService } from '@/auth/client-auth-service';
 import type { AuthState } from '@/auth/types';
 import type { CloudAdapter } from '@/cloud/cloud-service';
+import type { StorageSlot } from '@/storage';
 
 class MemStorage {
   private m = new Map<string, string>();
@@ -218,9 +219,15 @@ describe('FyreDbApp — tenant lifecycle', () => {
 });
 
 describe('FyreDbApp — encryption / unlock', () => {
-  function encryptedApp(opts?: { local?: StorageAdapter; cloud?: CloudAdapter }) {
+  function memSlot(): StorageSlot {
+    let v: string | null = null;
+    return { get: () => v, set: (x: string) => { v = x; }, clear: () => { v = null; } };
+  }
+
+  function encryptedApp(opts?: { local?: StorageAdapter; cloud?: CloudAdapter; credential?: StorageSlot }) {
     const local = opts?.local ?? new MemoryStorageAdapter();
     const cloud = opts?.cloud ?? cloudAdapter('google');
+    const credential = opts?.credential ?? memSlot();
     const { state$, service } = mockAuth({ status: 'loading' });
     const app = make({
       appId: 'test',
@@ -229,20 +236,20 @@ describe('FyreDbApp — encryption / unlock', () => {
       localAdapter: local,
       auth: service,
       providers: [cloud],
-      credentialCacheKey: 'cache',
+      credential,
     });
     state$.next({ status: 'signed-in', name: 'google' });
-    return { app, local, cloud, settled: settle(app) };
+    return { app, local, cloud, credential, settled: settle(app) };
   }
 
   async function signedInEncrypted() {
     const h = encryptedApp();
     await h.settled;
-    return h.app;
+    return h;
   }
 
   it('prompts to unlock an encrypted tenant, then opens on unlock', async () => {
-    const app = await signedInEncrypted();
+    const { app, credential } = await signedInEncrypted();
     const status = track<FyreDbStatus>(app.status$);
     const t = await app.createTenant({ name: 'Enc', meta: {}, encryption: { credential: 'pw' } });
     await app.closeTenant();
@@ -253,27 +260,48 @@ describe('FyreDbApp — encryption / unlock', () => {
     await app.unlock('pw');
     expect(status.value).toBe('ready');
     // credential cached for the session
-    expect(sessionStorage.getItem('cache')).not.toBeNull();
+    expect(credential.get()).not.toBeNull();
   });
 
   it('uses a cached credential to open without prompting (refresh)', async () => {
-    // app1 unlocks and caches the credential
     const h1 = encryptedApp();
     await h1.settled;
     const t = await h1.app.createTenant({ name: 'Enc', meta: {}, encryption: { credential: 'pw' } });
     await h1.app.openTenant(t.id);
     await h1.app.unlock('pw');
-    expect(sessionStorage.getItem('cache')).not.toBeNull();
+    expect(h1.credential.get()).not.toBeNull();
 
-    // app2 simulates a refresh: same storage + cache, opens without a prompt
-    const h2 = encryptedApp({ local: h1.local, cloud: h1.cloud });
+    // app2 simulates a refresh: same storage + cached credential slot
+    const h2 = encryptedApp({ local: h1.local, cloud: h1.cloud, credential: h1.credential });
     await h2.settled;
     await h2.app.openTenant(t.id);
     expect(h2.app.status).toBe('ready');
   });
 
+  it('does not reuse a cached credential for a different tenant', async () => {
+    const h = encryptedApp();
+    await h.settled;
+    const a = await h.app.createTenant({ name: 'A', meta: {}, encryption: { credential: 'pw-a' } });
+    const b = await h.app.createTenant({ name: 'B', meta: {}, encryption: { credential: 'pw-b' } });
+    await h.app.openTenant(a.id);
+    await h.app.unlock('pw-a'); // caches A's credential
+    expect(h.app.status).toBe('ready');
+    await h.app.openTenant(b.id); // A's cached credential must not be applied to B
+    expect(h.app.status).toBe('unlocking');
+  });
+
+  it('ignores corrupt cached credential data', async () => {
+    const credential = memSlot();
+    credential.set('not-json');
+    const h = encryptedApp({ credential });
+    await h.settled;
+    const t = await h.app.createTenant({ name: 'Enc', meta: {}, encryption: { credential: 'pw' } });
+    await h.app.openTenant(t.id);
+    expect(h.app.status).toBe('unlocking');
+  });
+
   it('unlock throws when nothing awaits unlock', async () => {
-    const app = await signedInEncrypted();
+    const { app } = await signedInEncrypted();
     expect(() => app.unlock('pw')).toThrow(FyreDbPluginConfigError);
   });
 });
@@ -333,16 +361,6 @@ describe('FyreDbApp — provider ops', () => {
 });
 
 describe('FyreDbApp — misc', () => {
-  it('derives and reuses a device id when none is provided', async () => {
-    const a = make({ appId: 'test', entities: [thing], localAdapter: new MemoryStorageAdapter(), encryption: false });
-    await settle(a);
-    const id1 = localStorage.getItem('test_device_id');
-    expect(id1).toBeTruthy();
-    const b = make({ appId: 'test', entities: [thing], localAdapter: new MemoryStorageAdapter(), encryption: false });
-    await settle(b);
-    expect(localStorage.getItem('test_device_id')).toBe(id1);
-  });
-
   it('swallows errors thrown by queued lifecycle ops', async () => {
     const { state$, service } = mockAuth({ status: 'loading' });
     const app = make({ ...base(), encryption: false, auth: service, providers: [cloudAdapter('google')] });

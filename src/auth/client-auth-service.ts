@@ -1,6 +1,7 @@
 import { BehaviorSubject, distinctUntilChanged, type Observable } from 'rxjs';
 import type { AccessToken, ClientAuthAdapter, AuthState, FeatureCreds } from './types';
 import { FyreDbPluginConfigError } from '@/errors/fyredb-error';
+import type { StorageSlot } from '@/storage';
 import { log } from '@/log';
 
 export type SupportedAuth = {
@@ -28,13 +29,13 @@ export class ClientAuthService {
   private inflight: Promise<AccessToken | null> | null = null;
   private readonly featureTokenCache = new Map<string, AccessToken>();
   private readonly state$$: BehaviorSubject<AuthState>;
-  private readonly returnUrlKey: string | undefined;
-  private readonly featureCredsKey: string | undefined;
+  private readonly returnUrlSlot: StorageSlot;
+  private readonly featureCredsSlot: StorageSlot;
   readonly state$: Observable<AuthState>;
 
   constructor(
     private readonly adapters: readonly ClientAuthAdapter[],
-    options?: { readonly returnUrlKey?: string; readonly featureCredsKey?: string },
+    options: { readonly returnUrl: StorageSlot; readonly featureCreds: StorageSlot },
   ) {
     const byName = new Map<string, ClientAuthAdapter>();
     for (const a of adapters) {
@@ -42,8 +43,8 @@ export class ClientAuthService {
       byName.set(a.name, a);
     }
     this.byName = byName;
-    this.returnUrlKey = options?.returnUrlKey;
-    this.featureCredsKey = options?.featureCredsKey;
+    this.returnUrlSlot = options.returnUrl;
+    this.featureCredsSlot = options.featureCreds;
     this.state$$ = new BehaviorSubject<AuthState>({ status: 'loading' });
     this.state$ = this.state$$.pipe(
       distinctUntilChanged((a, b) => a.status === b.status && a.name === b.name),
@@ -85,9 +86,7 @@ export class ClientAuthService {
     return this.adapters.map((a) => ({
       name: a.name,
       login: async (feature?: string) => {
-        if (this.returnUrlKey) {
-          sessionStorage.setItem(this.returnUrlKey, window.location.href);
-        }
+        this.returnUrlSlot.set(window.location.href);
         if (!feature || feature === 'login') this.cached = null;
         await a.login(feature);
       },
@@ -118,14 +117,13 @@ export class ClientAuthService {
   }
 
   /**
-   * Reads and clears the saved return URL from sessionStorage.
+   * Reads and clears the saved return URL from its storage slot.
    * Returns the URL if one was saved before the last login redirect,
    * or `fallback` if none was saved.
    */
   consumeReturnUrl(fallback = '/'): string {
-    if (!this.returnUrlKey) return fallback;
-    const raw = sessionStorage.getItem(this.returnUrlKey);
-    sessionStorage.removeItem(this.returnUrlKey);
+    const raw = this.returnUrlSlot.get();
+    this.returnUrlSlot.clear();
     if (!raw) return fallback;
     try {
       const url = new URL(raw);
@@ -137,8 +135,8 @@ export class ClientAuthService {
 
   /**
    * Processes the OAuth callback by delegating to each adapter's
-   * `handleCallback()`. Stores creds in sessionStorage if
-   * `featureCredsKey` is set. Returns the return URL and parsed creds.
+   * `handleCallback()`. Stores creds in the feature-creds slot.
+   * Returns the return URL and parsed creds.
    */
   handleCallback(fallbackUrl = '/'): { returnUrl: string; creds: FeatureCreds | null } {
     const returnUrl = this.consumeReturnUrl(fallbackUrl);
@@ -146,9 +144,7 @@ export class ClientAuthService {
       if (!adapter.handleCallback) continue;
       const creds = adapter.handleCallback();
       if (creds) {
-        if (this.featureCredsKey) {
-          sessionStorage.setItem(this.featureCredsKey, JSON.stringify(creds));
-        }
+        this.featureCredsSlot.set(JSON.stringify(creds));
         return { returnUrl, creds };
       }
     }
