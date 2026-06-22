@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
-import { MemoryStorageAdapter, defineEntity, type StorageAdapter, type Tenant } from '@fyre-db/core';
+import { MemoryStorageAdapter, defineEntity, FyreDbError, type StorageAdapter, type Tenant } from '@fyre-db/core';
 import { FyreDbApp, type FyreDbStatus, type Session } from '@/app/fyredb-app';
 import { FyreDbPluginConfigError } from '@/errors/fyredb-error';
 import type { ClientAuthService } from '@/auth/client-auth-service';
@@ -155,6 +155,12 @@ describe('FyreDbApp — tenant lifecycle', () => {
     expect(app.status).toBe('ready');
     expect(session.value?.id).toBe(1);
     expect(session.value?.tenant.id).toBe(t.id);
+    // sync getters reflect the active state
+    expect(app.tenant?.id).toBe(t.id);
+    expect(app.tenants.map((x) => x.id)).toContain(t.id);
+    expect(app.session?.id).toBe(1);
+    expect(app.auth).toBeDefined();
+    expect(app.encryption).toBeUndefined();
   });
 
   it('session id is monotonic across opens', async () => {
@@ -370,5 +376,90 @@ describe('FyreDbApp — misc', () => {
     await app.openTenant(t.id);
     vi.spyOn(app.db.tenants, 'close').mockRejectedValue(new Error('boom'));
     await expect(app.closeTenant()).resolves.toBeUndefined();
+  });
+});
+
+describe('FyreDbApp — coverage edge cases', () => {
+  it('falls back to LocalStorageAdapter when none is supplied', async () => {
+    const app = make({ appId: 'test', deviceId: 'dev1', entities: [thing] });
+    await app.useLocalOnly();
+    expect(app.status).toBe('no-tenant');
+  });
+
+  it('logs non-Error lifecycle failures without throwing', async () => {
+    const app = make({ ...base(), encryption: false });
+    await settle(app);
+    const enqueue = (app as unknown as { enqueue(fn: () => void): Promise<void> }).enqueue.bind(app);
+    await expect(enqueue(() => { throw 'oops'; })).resolves.toBeUndefined();
+  });
+
+  it('forwards db error events to error$', async () => {
+    const cloud = cloudAdapter('google');
+    const { state$, service } = mockAuth({ status: 'loading' });
+    const app = make({ ...base(), encryption: false, auth: service, providers: [cloud] });
+    state$.next({ status: 'signed-in', name: 'google' });
+    await settle(app);
+    const t = await app.createTenant({ name: 'A', meta: {} });
+    await app.openTenant(t.id);
+    const errors: FyreDbError[] = [];
+    app.error$.subscribe((e) => { errors.push(e); });
+    const boom = new FyreDbError('Boom', { kind: 'unknown' });
+    (cloud as unknown as { read: () => unknown }).read = () => { throw boom; };
+    await expect(app.db.tenants.sync()).rejects.toThrow('Boom');
+    expect(errors).toContain(boom);
+  });
+
+  it('openTenant with no active provider fails silently and keeps status', async () => {
+    const { service } = mockAuth({ status: 'signed-out' });
+    const app = make({ ...base(), encryption: false, auth: service, providers: [cloudAdapter('google')] });
+    await settle(app);
+    await expect(app.openTenant('missing')).resolves.toBeUndefined();
+    expect(app.status).toBe('signed-out');
+  });
+
+  it('sets error status when open fails with a non-Error value', async () => {
+    const { state$, service } = mockAuth({ status: 'loading' });
+    const app = make({ ...base(), encryption: false, auth: service, providers: [cloudAdapter('google')] });
+    state$.next({ status: 'signed-in', name: 'google' });
+    await settle(app);
+    const t = await app.createTenant({ name: 'A', meta: {} });
+    vi.spyOn(app.db.tenants, 'open').mockImplementation(() => { throw 'kaboom'; });
+    await app.openTenant(t.id);
+    expect(app.status).toBe('error');
+  });
+
+  it('signIn ignores a failing closeTenant', async () => {
+    const { state$, service, login } = mockAuth({ status: 'loading' });
+    const app = make({ ...base(), encryption: false, auth: service, providers: [cloudAdapter('google')] });
+    state$.next({ status: 'signed-in', name: 'google' });
+    await settle(app);
+    const t = await app.createTenant({ name: 'A', meta: {} });
+    await app.openTenant(t.id);
+    vi.spyOn(app.db.tenants, 'close').mockRejectedValue(new Error('boom'));
+    await app.signIn('google');
+    expect(login).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not rebuild when signed-in repeats for the active provider', async () => {
+    const { state$, service } = mockAuth({ status: 'loading' });
+    const app = make({ ...base(), encryption: false, auth: service, providers: [cloudAdapter('google')] });
+    state$.next({ status: 'signed-in', name: 'google' });
+    await settle(app);
+    const db1 = app.db;
+    state$.next({ status: 'signed-in', name: 'google' });
+    await settle(app);
+    expect(app.db).toBe(db1); // same provider → db not rebuilt
+  });
+
+  it('reaches ready without a session when open yields no active tenant', async () => {
+    const { state$, service } = mockAuth({ status: 'loading' });
+    const app = make({ ...base(), encryption: false, auth: service, providers: [cloudAdapter('google')] });
+    state$.next({ status: 'signed-in', name: 'google' });
+    await settle(app);
+    const t = await app.createTenant({ name: 'A', meta: {} });
+    vi.spyOn(app.db.tenants, 'open').mockResolvedValue(undefined as never);
+    await app.openTenant(t.id);
+    expect(app.status).toBe('ready');
+    expect(app.session).toBeNull();
   });
 });

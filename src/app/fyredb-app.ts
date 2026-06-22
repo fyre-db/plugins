@@ -145,7 +145,7 @@ export class FyreDbApp {
     const entry = this.authService?.supportedAuths().find((a) => a.name === provider);
     if (!entry) throw new FyreDbPluginConfigError(`FyreDbApp: unknown provider "${provider}"`);
     this.localOnly = false;
-    await this.closeTenant().catch(() => { /* no tenant open */ });
+    await this.closeTenant();
     await entry.login(); // BFF redirect — never resolves
   }
 
