@@ -72,6 +72,16 @@ describe('ClientAuthService', () => {
     expect(s).toEqual({ status: 'signed-in', name: 'google' });
   });
 
+  it('surfaces the token profile on the signed-in state', async () => {
+    const profile = { provider: 'google', userId: 'u-1', email: 'a@b.com', name: 'Ada', picture: '' };
+    const a = fakeAdapter('google', { ...tok('google', 'g-tok'), profile });
+    const svc = mkAuth([a]);
+    await svc.getAccessToken();
+    const s = await firstValueFrom(svc.state$.pipe(take(1)));
+    expect(s).toEqual({ status: 'signed-in', name: 'google', profile });
+    expect(svc.state).toEqual(s);
+  });
+
   it('getAccessToken caches within the leeway window', async () => {
     const a = fakeAdapter('google', tok('google', 'g-tok'));
     const svc = mkAuth([a]);

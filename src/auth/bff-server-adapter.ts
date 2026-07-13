@@ -1,4 +1,4 @@
-import type { ServerAuthAdapter, ServerAuthTokenResult, OAuthEndpoints } from './types';
+import type { ServerAuthAdapter, ServerAuthTokenResult, OAuthEndpoints, UserProfile, UserInfoMapper } from './types';
 import { StorageError, FyreDbPluginConfigError } from '@/errors/fyredb-error';
 import { log } from '@/log';
 
@@ -9,6 +9,12 @@ export type BffServerAdapterConfig = {
   readonly callbackUrl: string;
   readonly endpoints: OAuthEndpoints;
   readonly scopes: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Maps the provider's raw userinfo JSON to normalized profile fields.
+   * When omitted (or `endpoints.userinfoUrl` is unset), `fetchUserInfo`
+   * resolves `null`.
+   */
+  readonly userInfoMapper?: UserInfoMapper;
 };
 
 /**
@@ -68,6 +74,27 @@ export class BffServerAdapter implements ServerAuthAdapter {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ token: refreshToken }),
     });
+  }
+
+  async fetchUserInfo(accessToken: string): Promise<UserProfile | null> {
+    const { userinfoUrl } = this.config.endpoints;
+    const mapper = this.config.userInfoMapper;
+    if (!userinfoUrl || !mapper) return null;
+    try {
+      const response = await fetch(userinfoUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!response.ok) {
+        log.auth.warn('userinfo fetch failed for %s: status=%d', this.name, response.status);
+        return null;
+      }
+      const mapped = mapper(await response.json());
+      if (!mapped) return null;
+      return { provider: this.name, ...mapped };
+    } catch (err) {
+      log.auth.warn('userinfo fetch errored for %s: %s', this.name, err instanceof Error ? err.message : String(err));
+      return null;
+    }
   }
 
   private async tokenRequest(params: Record<string, string>): Promise<{

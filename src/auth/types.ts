@@ -11,7 +11,30 @@ export type AccessToken = {
   readonly token: string;
   /** Optional expiry (epoch ms). `undefined` = unknown. */
   readonly expiresAt?: number;
+  /** Signed-in account's normalized profile, when the server resolved it. */
+  readonly profile?: UserProfile;
 };
+
+/**
+ * Normalized identity of a signed-in / connected account, resolved by the
+ * server side from the provider's userinfo endpoint. Provider-agnostic shape.
+ */
+export type UserProfile = {
+  /** Issuing adapter name: 'google', 'microsoft', ... */
+  readonly provider: string;
+  /** Provider-stable account id (`sub` / `id`). */
+  readonly userId: string;
+  readonly email: string;
+  readonly name: string;
+  readonly picture: string;
+};
+
+/**
+ * Maps a provider's raw userinfo JSON to the provider-agnostic profile
+ * fields. `provider` is stamped by the adapter. Return `null` when the
+ * payload is missing a stable account id.
+ */
+export type UserInfoMapper = (raw: unknown) => Omit<UserProfile, 'provider'> | null;
 
 /**
  * Aggregate browser-side auth state derived by `ClientAuthService` from its
@@ -23,6 +46,8 @@ export type AuthState = {
   readonly status: AuthStateStatus;
   /** Active adapter's name when `status === 'signed-in'`. */
   readonly name?: string;
+  /** Signed-in account's normalized profile, when resolved by the server. */
+  readonly profile?: UserProfile;
 };
 
 /**
@@ -79,6 +104,8 @@ export type FeatureCreds = {
   readonly feature: string;
   readonly provider: string;
   readonly receivedAt: number;
+  /** Connected account's normalized profile, resolved by the server. */
+  readonly profile?: UserProfile;
 };
 
 /**
@@ -106,6 +133,12 @@ export type ServerAuthAdapter = {
   exchangeCode(code: string): Promise<ServerAuthTokenResult>;
   refresh(refreshToken: string): Promise<ServerAuthTokenResult>;
   logout(refreshToken: string): Promise<void>;
+  /**
+   * Resolve the account's normalized profile from an access token via the
+   * provider's userinfo endpoint. Best-effort — returns `null` when the
+   * provider has no userinfo endpoint configured or the fetch/mapping fails.
+   */
+  fetchUserInfo(accessToken: string): Promise<UserProfile | null>;
 };
 
 /**

@@ -1,4 +1,4 @@
-export type { AccessToken, AuthState, AuthStateStatus, ClientAuthAdapter, ServerAuthAdapter, ServerAuthTokenResult, OAuthEndpoints, FeatureCreds } from './types';
+export type { AccessToken, AuthState, AuthStateStatus, ClientAuthAdapter, ServerAuthAdapter, ServerAuthTokenResult, OAuthEndpoints, FeatureCreds, UserProfile, UserInfoMapper } from './types';
 export type { SupportedAuth } from './client-auth-service';
 
 export { ServerAuthService } from './server-auth-service';
