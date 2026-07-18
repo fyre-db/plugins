@@ -120,6 +120,35 @@ describe('BffClientAdapter', () => {
     expect(r?.name).toBe('google');
   });
 
+  it('refresh parses the profile from the response and stamps the resolved name', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        access_token: 'tok',
+        expires_in: 3600,
+        name: 'google',
+        profile: { userId: 'u-1', email: 'a@b.com', name: 'Ada', picture: 'http://pic' },
+      }),
+    );
+    const r = await newAdapter().refresh();
+    expect(r?.profile).toEqual({ provider: 'google', userId: 'u-1', email: 'a@b.com', name: 'Ada', picture: 'http://pic' });
+  });
+
+  it('refresh omits the profile when the payload lacks a userId', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ access_token: 'tok', expires_in: 3600, name: 'google', profile: { email: 'a@b.com' } }),
+    );
+    const r = await newAdapter().refresh();
+    expect(r?.profile).toBeUndefined();
+  });
+
+  it('refresh defaults absent profile fields to empty strings', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ access_token: 'tok', expires_in: 3600, name: 'google', profile: { userId: 'u-1' } }),
+    );
+    const r = await newAdapter().refresh();
+    expect(r?.profile).toEqual({ provider: 'google', userId: 'u-1', email: '', name: '', picture: '' });
+  });
+
   it('handleCallback parses tokens from the URL hash and clears it', () => {
     const replaceState = vi.fn();
     vi.stubGlobal('window', {
@@ -138,6 +167,30 @@ describe('BffClientAdapter', () => {
       provider: 'google',
     });
     expect(replaceState).toHaveBeenCalledWith(null, '', '/callback');
+  });
+
+  it('handleCallback parses the profile from the hash when present', () => {
+    vi.stubGlobal('window', {
+      location: {
+        hash: '#access_token=at&refresh_token=rt&feature=drive&provider=google&user_id=u-1&email=a%40b.com&name=Ada&picture=http%3A%2F%2Fpic',
+        pathname: '/callback',
+      },
+      history: { replaceState: vi.fn() },
+    });
+    const creds = newAdapter().handleCallback();
+    expect(creds?.profile).toEqual({ provider: 'google', userId: 'u-1', email: 'a@b.com', name: 'Ada', picture: 'http://pic' });
+  });
+
+  it('handleCallback leaves the profile undefined when identity params are absent', () => {
+    vi.stubGlobal('window', {
+      location: {
+        hash: '#access_token=at&refresh_token=rt&feature=drive&provider=google',
+        pathname: '/callback',
+      },
+      history: { replaceState: vi.fn() },
+    });
+    const creds = newAdapter().handleCallback();
+    expect(creds?.profile).toBeUndefined();
   });
 
   it('handleCallback defaults expiresIn to 3600 when absent', () => {

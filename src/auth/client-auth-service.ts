@@ -47,7 +47,7 @@ export class ClientAuthService {
     this.featureCredsSlot = options.featureCreds;
     this.state$$ = new BehaviorSubject<AuthState>({ status: 'loading' });
     this.state$ = this.state$$.pipe(
-      distinctUntilChanged((a, b) => a.status === b.status && a.name === b.name),
+      distinctUntilChanged((a, b) => a.status === b.status && a.name === b.name && a.profile?.userId === b.profile?.userId),
     );
 
     // Probe adapters so state$ transitions from 'loading' to
@@ -55,6 +55,11 @@ export class ClientAuthService {
     // explicit getAccessToken() call.
     log.auth('initialized with %d adapters', adapters.length);
     void this.getAccessToken();
+  }
+
+  /** Synchronous snapshot of the current auth state (for `useSyncExternalStore`). */
+  get state(): AuthState {
+    return this.state$$.value;
   }
 
   /**
@@ -196,7 +201,7 @@ export class ClientAuthService {
   private emit(): void {
     this.state$$.next(
       this.cached
-        ? { status: 'signed-in', name: this.cached.name }
+        ? { status: 'signed-in', name: this.cached.name, profile: this.cached.profile }
         : { status: 'signed-out' },
     );
   }

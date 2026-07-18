@@ -1,5 +1,19 @@
-import type { AccessToken, ClientAuthAdapter, FeatureCreds } from './types';
+import type { AccessToken, ClientAuthAdapter, FeatureCreds, UserProfile } from './types';
 import { log } from '@/log';
+
+function parseProfile(raw: unknown, provider: string): UserProfile | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const r = raw as Record<string, unknown>;
+  const userId = typeof r.userId === 'string' ? r.userId : '';
+  if (!userId) return undefined;
+  return {
+    provider,
+    userId,
+    email: typeof r.email === 'string' ? r.email : '',
+    name: typeof r.name === 'string' ? r.name : '',
+    picture: typeof r.picture === 'string' ? r.picture : '',
+  };
+}
 
 export type BffClientAdapterConfig = {
   /** Provider name. Must match the matching `BffServerAdapter`'s `name`. */
@@ -80,15 +94,17 @@ export class BffClientAdapter implements ClientAuthAdapter {
         } : {}),
       });
       if (!response.ok) return null;
-      const data = (await response.json()) as { access_token?: unknown; expires_in?: unknown; name?: unknown };
+      const data = (await response.json()) as { access_token?: unknown; expires_in?: unknown; name?: unknown; profile?: unknown };
       if (typeof data.access_token !== 'string' || typeof data.expires_in !== 'number') {
         return null;
       }
       log.auth('refresh succeeded for %s', this.name);
+      const name = typeof data.name === 'string' ? data.name : this.name;
       return {
-        name: typeof data.name === 'string' ? data.name : this.name,
+        name,
         token: data.access_token,
         expiresAt: Date.now() + data.expires_in * 1000,
+        profile: parseProfile(data.profile, name),
       };
     } catch {
       log.auth.warn('refresh failed for %s', this.name);
@@ -120,6 +136,16 @@ export class BffClientAdapter implements ClientAuthAdapter {
 
     window.history.replaceState(null, '', window.location.pathname);
 
+    const profile = parseProfile(
+      {
+        userId: params.get('user_id') ?? '',
+        email: params.get('email') ?? '',
+        name: params.get('name') ?? '',
+        picture: params.get('picture') ?? '',
+      },
+      provider,
+    );
+
     return {
       accessToken,
       refreshToken,
@@ -127,6 +153,7 @@ export class BffClientAdapter implements ClientAuthAdapter {
       feature,
       provider,
       receivedAt: Date.now(),
+      profile,
     };
   }
 }

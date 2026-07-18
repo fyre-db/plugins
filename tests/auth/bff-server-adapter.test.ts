@@ -178,4 +178,60 @@ describe('BffServerAdapter', () => {
     const adapter = new BffServerAdapter(baseConfig);
     await expect(adapter.exchangeCode('bad-code')).rejects.toThrow('Token request failed: 401');
   });
+
+  describe('fetchUserInfo()', () => {
+    const userinfoConfig: BffServerAdapterConfig = {
+      ...baseConfig,
+      endpoints: { ...baseConfig.endpoints, userinfoUrl: 'https://userinfo.example.com' },
+      userInfoMapper: (raw) => {
+        const r = raw as { id?: string };
+        return r.id ? { userId: r.id, email: 'a@b.com', name: 'Ada', picture: '' } : null;
+      },
+    };
+
+    it('fetches, maps, and stamps the provider', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'u-1' }) });
+      const adapter = new BffServerAdapter(userinfoConfig);
+      const profile = await adapter.fetchUserInfo('at-123');
+      expect(profile).toEqual({ provider: 'google', userId: 'u-1', email: 'a@b.com', name: 'Ada', picture: '' });
+      expect(mockFetch).toHaveBeenCalledWith('https://userinfo.example.com', {
+        headers: { Authorization: 'Bearer at-123' },
+      });
+    });
+
+    it('returns null when no userinfoUrl or mapper is configured', async () => {
+      const noUrl = new BffServerAdapter(baseConfig);
+      expect(await noUrl.fetchUserInfo('at')).toBeNull();
+      const noMapper = new BffServerAdapter({
+        ...baseConfig,
+        endpoints: { ...baseConfig.endpoints, userinfoUrl: 'https://userinfo.example.com' },
+      });
+      expect(await noMapper.fetchUserInfo('at')).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('returns null on a non-ok response', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+      const adapter = new BffServerAdapter(userinfoConfig);
+      expect(await adapter.fetchUserInfo('at')).toBeNull();
+    });
+
+    it('returns null when the mapper rejects the payload', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      const adapter = new BffServerAdapter(userinfoConfig);
+      expect(await adapter.fetchUserInfo('at')).toBeNull();
+    });
+
+    it('returns null when the fetch throws', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('network'));
+      const adapter = new BffServerAdapter(userinfoConfig);
+      expect(await adapter.fetchUserInfo('at')).toBeNull();
+    });
+
+    it('returns null when the fetch throws a non-Error value', async () => {
+      mockFetch.mockRejectedValueOnce('boom');
+      const adapter = new BffServerAdapter(userinfoConfig);
+      expect(await adapter.fetchUserInfo('at')).toBeNull();
+    });
+  });
 });

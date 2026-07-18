@@ -152,6 +152,13 @@ export class ServerAuthService {
         feature: state.feature,
         provider: state.provider,
       });
+      const profile = await adapter.fetchUserInfo(result.accessToken);
+      if (profile) {
+        params.set('user_id', profile.userId);
+        params.set('email', profile.email);
+        params.set('name', profile.name);
+        params.set('picture', profile.picture);
+      }
       const headers = new Headers();
       headers.set('Location', `${this.featureRedirectPath}#${params.toString()}`);
       headers.append('Set-Cookie', setCookieHeader(this.csrfCookieName, '', 0));
@@ -224,9 +231,15 @@ export class ServerAuthService {
       responseHeaders['Set-Cookie'] = setCookieHeader(this.refreshCookieName, cookieValue, REFRESH_MAX_AGE);
     }
 
+    const profile = await adapter.fetchUserInfo(result.accessToken);
     log.auth('login refresh succeeded for %s', adapter.name);
     return jsonResponse(
-      { access_token: result.accessToken, expires_in: result.expiresIn, name: adapter.name },
+      {
+        access_token: result.accessToken,
+        expires_in: result.expiresIn,
+        name: adapter.name,
+        ...(profile ? { profile } : {}),
+      },
       200,
       responseHeaders,
     );

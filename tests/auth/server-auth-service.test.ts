@@ -20,6 +20,7 @@ function mockAdapter(name = 'google'): ServerAuthAdapter {
     exchangeCode: vi.fn(async () => ({ accessToken: 'at', expiresIn: 3600, refreshToken: 'rt' })),
     refresh: vi.fn(async () => ({ accessToken: 'at2', expiresIn: 3600 })),
     logout: vi.fn(async () => {}),
+    fetchUserInfo: vi.fn(async () => null),
   };
 }
 
@@ -251,6 +252,25 @@ describe('ServerAuthService', () => {
     expect(cookies.some(c => c.startsWith('refresh='))).toBe(false);
   });
 
+  it('callback: feature flow folds the resolved profile into the hash', async () => {
+    const adapter = mockAdapter();
+    adapter.fetchUserInfo = vi.fn(async () => ({
+      provider: 'google', userId: 'u-1', email: 'a@b.com', name: 'Ada', picture: 'http://pic',
+    }));
+    const svc = new ServerAuthService([adapter], DEFAULT_OPTS);
+    const { req } = callbackRequest('google', 'gmail');
+
+    const res = await svc.fetch(req);
+
+    const location = res.headers.get('Location')!;
+    const hash = new URLSearchParams(location.split('#')[1]);
+    expect(hash.get('user_id')).toBe('u-1');
+    expect(hash.get('email')).toBe('a@b.com');
+    expect(hash.get('name')).toBe('Ada');
+    expect(hash.get('picture')).toBe('http://pic');
+    expect(adapter.fetchUserInfo).toHaveBeenCalledWith('at');
+  });
+
   // ─── POST /refresh (login) ──────────────────────────────
 
   it('refresh: returns new access token for login refresh', async () => {
@@ -265,7 +285,21 @@ describe('ServerAuthService', () => {
     expect(body.access_token).toBe('at2');
     expect(body.expires_in).toBe(3600);
     expect(body.name).toBe('google');
+    expect(body.profile).toBeUndefined();
     expect(adapter.refresh).toHaveBeenCalledWith('rt123');
+  });
+
+  it('refresh: includes the resolved profile in the login refresh payload', async () => {
+    const adapter = mockAdapter();
+    const profile = { provider: 'google', userId: 'u-1', email: 'a@b.com', name: 'Ada', picture: '' };
+    adapter.fetchUserInfo = vi.fn(async () => profile);
+    const svc = new ServerAuthService([adapter], DEFAULT_OPTS);
+
+    const res = await svc.fetch(refreshRequest('google', 'rt123'));
+
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.profile).toEqual(profile);
+    expect(adapter.fetchUserInfo).toHaveBeenCalledWith('at2');
   });
 
   it('refresh: updates cookie when refreshToken is rotated', async () => {
