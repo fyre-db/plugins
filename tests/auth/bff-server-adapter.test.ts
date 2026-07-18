@@ -227,5 +227,11 @@ describe('BffServerAdapter', () => {
       const adapter = new BffServerAdapter(userinfoConfig);
       expect(await adapter.fetchUserInfo('at')).toBeNull();
     });
+
+    it('returns null when the fetch throws a non-Error value', async () => {
+      mockFetch.mockRejectedValueOnce('boom');
+      const adapter = new BffServerAdapter(userinfoConfig);
+      expect(await adapter.fetchUserInfo('at')).toBeNull();
+    });
   });
 });

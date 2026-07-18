@@ -69,6 +69,15 @@ describe('MICROSOFT_USERINFO_MAPPER', () => {
     });
   });
 
+  it('leaves the email empty when neither mail nor userPrincipalName is present', () => {
+    expect(MICROSOFT_USERINFO_MAPPER({ id: 'm-1' })).toEqual({
+      userId: 'm-1',
+      email: '',
+      name: '',
+      picture: '',
+    });
+  });
+
   it('returns null without a stable id or for non-objects', () => {
     expect(MICROSOFT_USERINFO_MAPPER({ mail: 'a@b.com' })).toBeNull();
     expect(MICROSOFT_USERINFO_MAPPER(null)).toBeNull();

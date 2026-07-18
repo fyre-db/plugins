@@ -141,6 +141,14 @@ describe('BffClientAdapter', () => {
     expect(r?.profile).toBeUndefined();
   });
 
+  it('refresh defaults absent profile fields to empty strings', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ access_token: 'tok', expires_in: 3600, name: 'google', profile: { userId: 'u-1' } }),
+    );
+    const r = await newAdapter().refresh();
+    expect(r?.profile).toEqual({ provider: 'google', userId: 'u-1', email: '', name: '', picture: '' });
+  });
+
   it('handleCallback parses tokens from the URL hash and clears it', () => {
     const replaceState = vi.fn();
     vi.stubGlobal('window', {
